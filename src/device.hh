@@ -16,7 +16,9 @@ struct device
     device(device&& other) = delete;
     ~device();
 
-    void finish();
+    void finish() const;
+
+    bool supports_ray_tracing;
 
     VkPhysicalDevice physical_device;
     VkDevice logical_device;
@@ -24,6 +26,9 @@ struct device
     VkPhysicalDeviceFeatures2 physical_device_features;
     VkPhysicalDeviceVulkan12Features vulkan12_features;
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_address_features;
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features;
     int32_t compute_family_index;
     int32_t graphics_family_index;
     VkQueue graphics_queue;

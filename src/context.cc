@@ -223,7 +223,7 @@ void context::init_sdl(bool fullscreen, bool grab_mouse)
         throw std::runtime_error(SDL_GetError());
 
     win = SDL_CreateWindow(
-        "MyGraphicsProject",
+        "RayBoy",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         size.x,

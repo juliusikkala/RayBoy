@@ -2,7 +2,7 @@
 #define RAYBOY_CONTEXT_HH
 
 #include "device.hh"
-#include "glm/glm.hpp"
+#include "math.hh"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 #include <vector>
@@ -13,8 +13,6 @@
 #include "reaper.hh"
 #include "render_target.hh"
 #include "vkres.hh"
-
-using namespace glm;
 
 class context
 {

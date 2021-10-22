@@ -20,6 +20,24 @@ vkres<VkSemaphore> create_binary_semaphore(context& ctx);
 vkres<VkSemaphore> create_timeline_semaphore(context& ctx, uint64_t start_value = 0);
 void wait_timeline_semaphore(context& ctx, VkSemaphore sem, uint64_t wait_value);
 vkres<VkShaderModule> load_shader(context& ctx, size_t bytes, const uint32_t* data);
+vkres<VkBuffer> create_gpu_buffer(context& ctx, size_t bytes, VkBufferUsageFlagBits usage);
+vkres<VkBuffer> create_cpu_buffer(context& ctx, size_t bytes, void* initial_data = nullptr);
+
+void copy_buffer(
+    context& ctx,
+    VkBuffer dst_buffer,
+    VkBuffer src_buffer,
+    size_t bytes
+);
+vkres<VkBuffer> upload_buffer(
+    context& ctx,
+    size_t bytes,
+    void* data,
+    VkBufferUsageFlags usage
+);
+
+VkCommandBuffer begin_command_buffer(context& ctx);
+void end_command_buffer(context& ctx, VkCommandBuffer buf);
 
 std::vector<VkDescriptorPoolSize> calculate_descriptor_pool_sizes(
     size_t binding_count,

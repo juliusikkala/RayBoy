@@ -2,6 +2,7 @@
 #define RAYBOY_VKRES_HH
 
 #include "volk.h"
+#include "vk_mem_alloc.h"
 
 class context;
 
@@ -48,5 +49,28 @@ private:
     VkCommandPool pool;
     context* ctx;
 };
+
+template<>
+class vkres<VkBuffer>
+{
+public:
+    vkres();
+    vkres(context& ctx, VkBuffer buf = VK_NULL_HANDLE, VmaAllocation alloc = VK_NULL_HANDLE);
+    vkres(vkres<VkBuffer>& other) = delete;
+    vkres(vkres<VkBuffer>&& other);
+    ~vkres();
+
+    void reset(VkBuffer buf = VK_NULL_HANDLE, VmaAllocation alloc = VK_NULL_HANDLE);
+    void operator=(vkres<VkBuffer>&& other);
+
+    const VkBuffer& operator*() const;
+    operator VkBuffer();
+
+private:
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    context* ctx;
+};
+
 
 #endif

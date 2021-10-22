@@ -2,6 +2,35 @@
 #include <string>
 #include <iostream>
 
+namespace
+{
+
+bool has_all_extensions(
+    const std::vector<VkExtensionProperties>& props,
+    const char** extensions,
+    size_t extension_count
+){
+    for(size_t i = 0; i < extension_count; ++i)
+    {
+        std::string required_name = extensions[i];
+        bool found = false;
+        for(VkExtensionProperties props: props)
+        {
+            if(required_name == props.extensionName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if(!found)
+            return false;
+    }
+    return true;
+}
+
+}
+
 device::device(
     VkInstance vulkan,
     VkSurfaceKHR surface,
@@ -11,6 +40,12 @@ device::device(
         VK_KHR_MAINTENANCE1_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+    const char* rt_device_extensions[] = {
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+        VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
     };
 
     // Find all physical devices
@@ -22,33 +57,22 @@ device::device(
     // Iterate through devices, looking for the one that supports all the things
     // we require
     bool found_device = false;
+    bool found_rt_device = false;
+    bool found_discrete_device = false;
     for(VkPhysicalDevice device: physical_devices)
     {
         // Check for extensions
         uint32_t available_count = 0;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &available_count, nullptr);
-        std::vector<VkExtensionProperties> properties(available_count);
-        vkEnumerateDeviceExtensionProperties(device, nullptr, &available_count, properties.data());
+        std::vector<VkExtensionProperties> extensions(available_count);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &available_count, extensions.data());
 
-        uint32_t found_all_required = true;
-        for(const std::string& required_name: required_device_extensions)
-        {
-            bool found = false;
-            for(VkExtensionProperties props: properties)
-            {
-                if(required_name == props.extensionName)
-                {
-                    found = true;
-                    break;
-                }
-            }
+        bool found_all_required = true;
+        if(!has_all_extensions(extensions, required_device_extensions, std::size(required_device_extensions)))
+            continue;
 
-            if(!found)
-            {
-                found_all_required = false;
-                break;
-            }
-        }
+        bool current_has_rt = has_all_extensions(extensions, rt_device_extensions, std::size(rt_device_extensions));
+        bool current_is_discrete = physical_device_props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
         // Find required queue families
         uint32_t queue_family_count = 0;
@@ -80,18 +104,24 @@ device::device(
         }
 
         // Get properties
-        physical_device_props = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, nullptr};
-        vkGetPhysicalDeviceProperties2(device, &physical_device_props);
+        VkPhysicalDeviceProperties2 properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, nullptr};
+        vkGetPhysicalDeviceProperties2(device, &properties);
 
         // Found a suitable device
-        if(found_all_required && compute_family != -1 && graphics_family != -1
-        // && physical_device_props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+        if(
+            found_all_required &&
+            compute_family != -1 &&
+            graphics_family != -1 &&
+            (!found_rt_device || current_has_rt) &&
+            (!found_discrete_device || current_is_discrete)
         ){
             physical_device = device;
+            physical_device_props = properties;
             compute_family_index = compute_family;
             graphics_family_index = graphics_family;
             found_device = true;
-            break;
+            found_rt_device = current_has_rt;
+            found_discrete_device = current_is_discrete;
         }
     }
 
@@ -99,16 +129,25 @@ device::device(
         throw std::runtime_error("Failed to find a device suitable for rendering");
 
     std::cout << "Using " << physical_device_props.properties.deviceName << std::endl;
+    supports_ray_tracing = found_rt_device;
+    std::cout << "Ray tracing " << (supports_ray_tracing ? "enabled" : "disabled") << std::endl;
 
     // Get features
     physical_device_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &vulkan12_features};
     vulkan12_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &sync2_features};
-    sync2_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR, nullptr};
+    sync2_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR, &buffer_address_features};
+    buffer_address_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_ADDRESS_FEATURES_EXT, &rt_pipeline_features};
+    rt_pipeline_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR, &as_features};
+    as_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR, nullptr};
     vkGetPhysicalDeviceFeatures2(physical_device, &physical_device_features);
+
+    if(!found_rt_device)
+        sync2_features.pNext = nullptr;
 
     physical_device_features.features.samplerAnisotropy = VK_TRUE;
     vulkan12_features.timelineSemaphore = VK_TRUE;
     vulkan12_features.scalarBlockLayout = VK_TRUE;
+    buffer_address_features.bufferDeviceAddress = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
 
     // Create device
@@ -153,6 +192,8 @@ device::device(
     allocator_info.device = logical_device;
     allocator_info.instance = vulkan;
     allocator_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    if(found_rt_device)
+        allocator_info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocator_info, &allocator);
 }
 
@@ -164,7 +205,7 @@ device::~device()
     vkDestroyDevice(logical_device, nullptr);
 }
 
-void device::finish()
+void device::finish() const
 {
     vkDeviceWaitIdle(logical_device);
 }

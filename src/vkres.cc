@@ -135,8 +135,66 @@ vkres<VkCommandBuffer>::operator VkCommandBuffer()
     return value;
 }
 
+vkres<VkBuffer>::vkres()
+: buffer(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE), ctx(nullptr)
+{
+}
+
+vkres<VkBuffer>::vkres(context& ctx, VkBuffer buf, VmaAllocation alloc)
+: buffer(buf), allocation(alloc), ctx(&ctx)
+{
+}
+
+vkres<VkBuffer>::vkres(vkres<VkBuffer>&& other)
+{
+    operator=(std::move(other));
+}
+
+vkres<VkBuffer>::~vkres()
+{
+    reset();
+}
+
+void vkres<VkBuffer>::reset(VkBuffer buf, VmaAllocation alloc)
+{
+    if(ctx && buffer)
+    {
+        const device& dev = ctx->get_device();
+        ctx->at_frame_finish([
+            buffer=this->buffer,
+            allocation=this->allocation,
+            logical_device=dev.logical_device,
+            allocator=dev.allocator
+        ](){
+            vkDestroyBuffer(logical_device, buffer, nullptr);
+            if(allocation != VK_NULL_HANDLE)
+                vmaFreeMemory(allocator, allocation);
+        });
+    }
+    buffer = buf;
+    allocation = alloc;
+}
+
+void vkres<VkBuffer>::operator=(vkres<VkBuffer>&& other)
+{
+    this->buffer = other.buffer;
+    this->allocation = other.allocation;
+    this->ctx = other.ctx;
+    other.buffer = VK_NULL_HANDLE;
+    other.allocation = VK_NULL_HANDLE;
+}
+
+const VkBuffer& vkres<VkBuffer>::operator*() const
+{
+    return buffer;
+}
+
+vkres<VkBuffer>::operator VkBuffer()
+{
+    return buffer;
+}
+
 template class vkres<VkAccelerationStructureKHR>;
-template class vkres<VkBuffer>;
 template class vkres<VkBufferView>;
 template class vkres<VkCommandPool>;
 template class vkres<VkDescriptorPool>;
