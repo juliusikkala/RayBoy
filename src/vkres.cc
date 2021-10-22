@@ -194,13 +194,71 @@ vkres<VkBuffer>::operator VkBuffer()
     return buffer;
 }
 
+vkres<VkImage>::vkres()
+: image(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE), ctx(nullptr)
+{
+}
+
+vkres<VkImage>::vkres(context& ctx, VkImage img, VmaAllocation alloc)
+: image(img), allocation(alloc), ctx(&ctx)
+{
+}
+
+vkres<VkImage>::vkres(vkres<VkImage>&& other)
+{
+    operator=(std::move(other));
+}
+
+vkres<VkImage>::~vkres()
+{
+    reset();
+}
+
+void vkres<VkImage>::reset(VkImage img, VmaAllocation alloc)
+{
+    if(ctx && image)
+    {
+        const device& dev = ctx->get_device();
+        ctx->at_frame_finish([
+            image=this->image,
+            allocation=this->allocation,
+            logical_device=dev.logical_device,
+            allocator=dev.allocator
+        ](){
+            vkDestroyImage(logical_device, image, nullptr);
+            if(allocation != VK_NULL_HANDLE)
+                vmaFreeMemory(allocator, allocation);
+        });
+    }
+    image = img;
+    allocation = alloc;
+}
+
+void vkres<VkImage>::operator=(vkres<VkImage>&& other)
+{
+    this->image = other.image;
+    this->allocation = other.allocation;
+    this->ctx = other.ctx;
+    other.image = VK_NULL_HANDLE;
+    other.image = VK_NULL_HANDLE;
+}
+
+const VkImage& vkres<VkImage>::operator*() const
+{
+    return image;
+}
+
+vkres<VkImage>::operator VkImage()
+{
+    return image;
+}
+
 template class vkres<VkAccelerationStructureKHR>;
 template class vkres<VkBufferView>;
 template class vkres<VkCommandPool>;
 template class vkres<VkDescriptorPool>;
 template class vkres<VkDescriptorSetLayout>;
 template class vkres<VkFramebuffer>;
-template class vkres<VkImage>;
 template class vkres<VkImageView>;
 template class vkres<VkPipeline>;
 template class vkres<VkPipelineLayout>;

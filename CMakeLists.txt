@@ -41,6 +41,7 @@ endif()
 add_subdirectory(external/volk)
 add_executable(rayboy
     external/vk_mem_alloc.cc
+    external/stb_image.cc
     src/main.cc
     src/context.cc
     src/device.cc
@@ -55,9 +56,12 @@ add_executable(rayboy
     src/timer.cc
     src/math.cc
     src/mesh.cc
+    src/material.cc
+    src/texture.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
+    "external"
     "external/glm"
     "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"

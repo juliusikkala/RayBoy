@@ -72,5 +72,27 @@ private:
     context* ctx;
 };
 
+template<>
+class vkres<VkImage>
+{
+public:
+    vkres();
+    vkres(context& ctx, VkImage img = VK_NULL_HANDLE, VmaAllocation alloc = VK_NULL_HANDLE);
+    vkres(vkres<VkImage>& other) = delete;
+    vkres(vkres<VkImage>&& other);
+    ~vkres();
+
+    void reset(VkImage img = VK_NULL_HANDLE, VmaAllocation alloc = VK_NULL_HANDLE);
+    void operator=(vkres<VkImage>&& other);
+
+    const VkImage& operator*() const;
+    operator VkImage();
+
+private:
+    VkImage image;
+    VmaAllocation allocation;
+    context* ctx;
+};
+
 
 #endif

@@ -16,7 +16,7 @@ vkres<VkImageView> create_image_view(
         format,
         {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
          VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
-        {aspect, 0, 1, 0, 1}
+        {aspect, 0, VK_REMAINING_MIP_LEVELS, 0, 1}
     };
     vkCreateImageView(ctx.get_device().logical_device, &view_info, nullptr, &view);
     return {ctx, view};
@@ -154,6 +154,134 @@ vkres<VkBuffer> create_cpu_buffer(
     return vkres<VkBuffer>(ctx, buffer, alloc);
 }
 
+vkres<VkImage> create_gpu_image(
+    context& ctx,
+    uvec2 size,
+    VkFormat format,
+    VkImageLayout layout,
+    VkSampleCountFlagBits samples,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    size_t bytes,
+    void* data,
+    bool mipmapped
+){
+    if(data)
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if(mipmapped)
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    VkImageCreateInfo info = {
+        VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        nullptr,
+        0,
+        VK_IMAGE_TYPE_2D,
+        format,
+        {size.x, size.y, 1},
+        mipmapped ? calculate_mipmap_count(size) : 1,
+        1,
+        samples,
+        tiling,
+        usage,
+        VK_SHARING_MODE_EXCLUSIVE,
+        0,
+        nullptr,
+        !data ? layout : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    };
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    VkImage img;
+    VmaAllocation alloc;
+
+    vmaCreateImage(
+        ctx.get_device().allocator, (VkImageCreateInfo*)&info,
+        &alloc_info, &img,
+        &alloc, nullptr
+    );
+
+    if(data)
+    {
+        vkres<VkBuffer> buf = create_cpu_buffer(ctx, bytes, data);
+
+        VkCommandBuffer cmd = begin_command_buffer(ctx);
+
+        VkBufferImageCopy copy = {
+            0, 0, 0,
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {size.x, size.y, 1}
+        };
+        vkCmdCopyBufferToImage(
+            cmd, buf, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy
+        );
+
+        if(mipmapped)
+            generate_mipmaps(
+                cmd, img, size, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
+            );
+        else
+        {
+            image_barrier(
+                cmd, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
+            );
+        }
+
+        end_command_buffer(ctx, cmd);
+    }
+
+    return vkres<VkImage>(ctx, img, alloc);
+}
+
+void generate_mipmaps(
+    VkCommandBuffer cmd,
+    VkImage img,
+    uvec2 size,
+    VkImageLayout before,
+    VkImageLayout after
+){
+    unsigned mipmap_count = calculate_mipmap_count(size);
+    if(before != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+        image_barrier(
+            cmd, img, before, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        );
+    }
+
+    for(unsigned i = 1; i < mipmap_count; ++i)
+    {
+        image_barrier(
+            cmd, img,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            i-1, 1
+        );
+        uvec2 next_size = max(size/2u, uvec2(1));
+        VkImageBlit blit = {
+            {VK_IMAGE_ASPECT_COLOR_BIT, i-1, 0, 1},
+            {{0,0,0}, {(int32_t)size.x, (int32_t)size.y, 1}},
+            {VK_IMAGE_ASPECT_COLOR_BIT, i, 0, 1},
+            {{0,0,0}, {(int32_t)next_size.x, (int32_t)next_size.y, 1}}
+        };
+        vkCmdBlitImage(
+            cmd,
+            img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1, &blit,
+            VK_FILTER_LINEAR
+        );
+        size = next_size;
+        image_barrier(
+            cmd, img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, after, i-1, 1
+        );
+    }
+
+    image_barrier(
+        cmd, img,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        after,
+        mipmap_count-1, 1
+    );
+}
+
 void copy_buffer(
     context& ctx,
     VkBuffer dst_buffer,
@@ -276,6 +404,8 @@ void image_barrier(
     VkImage image,
     VkImageLayout layout_before,
     VkImageLayout layout_after,
+    uint32_t mip_level,
+    uint32_t mip_count,
     VkAccessFlags2KHR happens_before,
     VkAccessFlags2KHR happens_after,
     VkPipelineStageFlags2KHR stage_before,
@@ -293,7 +423,11 @@ void image_barrier(
         VK_QUEUE_FAMILY_IGNORED,
         VK_QUEUE_FAMILY_IGNORED,
         image,
-        {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}
+        {
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            mip_level, mip_count,
+            0, VK_REMAINING_ARRAY_LAYERS
+        }
     };
     VkDependencyInfoKHR dependency_info = {
         VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,

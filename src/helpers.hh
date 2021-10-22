@@ -22,6 +22,26 @@ void wait_timeline_semaphore(context& ctx, VkSemaphore sem, uint64_t wait_value)
 vkres<VkShaderModule> load_shader(context& ctx, size_t bytes, const uint32_t* data);
 vkres<VkBuffer> create_gpu_buffer(context& ctx, size_t bytes, VkBufferUsageFlagBits usage);
 vkres<VkBuffer> create_cpu_buffer(context& ctx, size_t bytes, void* initial_data = nullptr);
+vkres<VkImage> create_gpu_image(
+    context& ctx,
+    uvec2 size,
+    VkFormat format,
+    VkImageLayout layout,
+    VkSampleCountFlagBits samples,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    size_t bytes = 0,
+    void* data = nullptr,
+    bool mipmapped = false
+);
+
+void generate_mipmaps(
+    VkCommandBuffer cmd,
+    VkImage img,
+    uvec2 size,
+    VkImageLayout before,
+    VkImageLayout after
+);
 
 void copy_buffer(
     context& ctx,
@@ -50,6 +70,8 @@ void image_barrier(
     VkImage image,
     VkImageLayout layout_before,
     VkImageLayout layout_after,
+    uint32_t mip_level = 0,
+    uint32_t mip_count = VK_REMAINING_MIP_LEVELS,
     VkAccessFlags2KHR happens_before = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR,
     VkAccessFlags2KHR happens_after = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR,
     VkPipelineStageFlags2KHR stage_before = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
