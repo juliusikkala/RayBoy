@@ -1,48 +1,13 @@
 #include "context.hh"
-#include "xor_render_stage.hh"
+#include "plain_render_pipeline.hh"
 #include <iostream>
 #include <memory>
-
-class render_pipeline
-{
-public:
-    render_pipeline(context& ctx)
-    : ctx(ctx)
-    {
-        reset();
-    }
-
-    void reset()
-    {
-        render_target target = ctx.get_render_target();
-        xor_stage.reset(new xor_render_stage(ctx, target));
-    }
-
-    void render()
-    {
-        while(ctx.start_frame())
-        {
-            ctx.reset_swapchain();
-            reset();
-        }
-        uint32_t image_index = ctx.get_image_index();
-
-        VkSemaphore prev = ctx.get_start_semaphore();
-        prev = xor_stage->run(image_index, prev);
-
-        // Finish the frame with the semaphore of the last rendering step
-        ctx.finish_frame(prev);
-    }
-
-private:
-    context& ctx;
-    std::unique_ptr<xor_render_stage> xor_stage;
-};
 
 int main()
 {
     context ctx;
-    render_pipeline pipeline(ctx);
+    std::unique_ptr<render_pipeline> pipeline;
+    pipeline.reset(new plain_render_pipeline(ctx));
 
     bool running = true;
     unsigned counter = 0;
@@ -61,12 +26,16 @@ int main()
                 {
                     running = false;
                 }
+                if(event.key.keysym.sym == SDLK_t)
+                {
+                    ctx.dump_timing();
+                }
                 break;
             }
         }
 
         //std::cout << counter++ << std::endl;
-        pipeline.render();
+        pipeline->render();
     }
 
     return 0;

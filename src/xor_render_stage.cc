@@ -3,7 +3,7 @@
 #include "render_target.hh"
 
 xor_render_stage::xor_render_stage(context& ctx, render_target& target)
-: render_stage(ctx)
+: render_stage(ctx), stage_timer(ctx, "xor_render_stage")
 {
     init_bindings(
         ctx.get_image_count(), 
@@ -21,12 +21,14 @@ xor_render_stage::xor_render_stage(context& ctx, render_target& target)
         // Record command buffer
         VkCommandBuffer buf = begin_compute_commands(i);
 
+        stage_timer.start(buf, i);
         target.transition_layout(buf, i, VK_IMAGE_LAYOUT_GENERAL);
 
         ivec2 size = ctx.get_size();
         vkCmdDispatch(buf, (size.x+7)/8, (size.y+7)/8, 1);
 
         target.transition_layout(buf, i, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        stage_timer.stop(buf, i);
         finish_compute_commands(buf);
     }
 }

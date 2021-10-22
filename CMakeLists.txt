@@ -50,6 +50,9 @@ add_executable(rayboy
     src/render_stage.cc
     src/render_target.cc
     src/xor_render_stage.cc
+    src/render_pipeline.cc
+    src/plain_render_pipeline.cc
+    src/timer.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

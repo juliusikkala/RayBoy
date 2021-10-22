@@ -6,7 +6,10 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 #include <vector>
+#include <string>
+#include <unordered_map>
 #include <memory>
+#include <chrono>
 #include "reaper.hh"
 #include "render_target.hh"
 #include "vkres.hh"
@@ -43,6 +46,11 @@ public:
 
     void at_frame_finish(std::function<void()>&& cleanup);
 
+    VkQueryPool get_timestamp_query_pool(uint32_t image_index);
+    int32_t add_timer(const std::string& name);
+    void remove_timer(uint32_t image_index);
+    void dump_timing() const;
+
 private:
     void init_sdl(bool fullscreen, bool grab_mouse);
     void deinit_sdl();
@@ -52,6 +60,10 @@ private:
 
     void init_swapchain();
     void deinit_swapchain();
+
+    void init_timing();
+    void deinit_timing();
+    void update_timing_results(uint32_t image_index);
 
     // SDL-related members
     ivec2 size;
@@ -77,6 +89,14 @@ private:
     vkres<VkSemaphore> frame_start_semaphore;
     uint64_t frame_counter;
     uint32_t image_index;
+    std::vector<int32_t> image_index_history;
+
+    // Timing resources
+    std::vector<VkQueryPool> timestamp_query_pools;
+    std::vector<int32_t> free_queries;
+    std::unordered_map<int32_t, std::string> timers;
+    std::vector<std::chrono::steady_clock::time_point> cpu_frame_start_time;
+    std::vector<std::pair<std::string, double>> timing_results;
 
     // Memory handling
     reaper reap;

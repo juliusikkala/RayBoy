@@ -3,6 +3,9 @@
 #include <stdexcept>
 #include <iostream>
 #include <algorithm>
+#include <numeric>
+
+constexpr uint32_t MAX_TIMER_COUNT = 32;
 
 context::context(
     ivec2 size,
@@ -16,11 +19,13 @@ context::context(
         throw std::runtime_error(SDL_GetError());
     dev.reset(new device(vulkan, surface, validation_layers));
     init_swapchain();
+    init_timing();
 }
 
 context::~context()
 {
     dev->finish();
+    deinit_timing();
     deinit_swapchain();
     reap.flush();
     dev.reset();
@@ -41,6 +46,7 @@ bool context::start_frame()
 
     // This is the binary semaphore we will be using
     VkSemaphore sem = binary_start_semaphores[frame_counter%binary_start_semaphores.size()];
+    uint32_t image_history_index = frame_counter%image_index_history.size();
 
     // Wait until that semaphore cannot be in use anymore
     if(frame_counter >= binary_start_semaphores.size())
@@ -50,6 +56,7 @@ bool context::start_frame()
             frame_counter - (binary_start_semaphores.size() - 1)
         );
         reap.finish_frame();
+        update_timing_results(image_index_history[image_history_index]);
     }
 
     // Get next swapchain image index
@@ -61,6 +68,8 @@ bool context::start_frame()
     {
         return true;
     }
+    image_index_history[image_history_index] = image_index;
+    cpu_frame_start_time[image_index] = std::chrono::steady_clock::now();
 
     // Convert the binary semaphore into a timeline semaphore
     VkSemaphoreSubmitInfoKHR wait_info = {
@@ -80,6 +89,7 @@ bool context::start_frame()
         1, &signal_info
     };
     vkQueueSubmit2KHR(dev->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+
     return false;
 }
 
@@ -170,6 +180,41 @@ ivec2 context::get_size() const
 void context::at_frame_finish(std::function<void()>&& cleanup)
 {
     reap.at_finish(std::move(cleanup));
+}
+
+VkQueryPool context::get_timestamp_query_pool(uint32_t image_index)
+{
+    return timestamp_query_pools[image_index];
+}
+
+int32_t context::add_timer(const std::string& name)
+{
+    if(free_queries.size() == 0)
+    {
+        std::cerr << "Failed to get a timer query for " << name << std::endl;
+        return -1;
+    }
+    int32_t index = free_queries.back();
+    free_queries.pop_back();
+    timers.emplace(index, name);
+    return index;
+}
+
+void context::remove_timer(uint32_t image_index)
+{
+    free_queries.push_back(image_index);
+    timers.erase(image_index);
+}
+
+void context::dump_timing() const
+{
+    std::cout << "Timing:" << std::endl;
+    for(const auto& pair: timing_results)
+    {
+        std::cout
+            << "\t[" << pair.first << "]: "
+            << pair.second*1e3 << "ms" << std::endl;
+    }
 }
 
 void context::init_sdl(bool fullscreen, bool grab_mouse)
@@ -389,14 +434,111 @@ void context::init_swapchain()
     }
     frame_start_semaphore = create_timeline_semaphore(*this);
     frame_counter = 0;
+    image_index_history.resize(image_count, -1);
 }
 
 void context::deinit_swapchain()
 {
     dev->finish();
+    image_index_history.clear();
     frame_start_semaphore.reset();
     binary_start_semaphores.clear();
     binary_finish_semaphores.clear();
     swapchain_image_views.clear();
     vkDestroySwapchainKHR(dev->logical_device, swapchain, nullptr);
+}
+
+void context::init_timing()
+{
+    uint32_t image_count = get_image_count();
+    timestamp_query_pools.resize(image_count);
+    cpu_frame_start_time.resize(image_count);
+    for(uint32_t i = 0; i < image_count; ++i)
+    {
+        VkQueryPoolCreateInfo info = {
+            VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+            nullptr,
+            {},
+            VK_QUERY_TYPE_TIMESTAMP,
+            MAX_TIMER_COUNT*2,
+            0
+        };
+        vkCreateQueryPool(
+            dev->logical_device,
+            &info,
+            nullptr,
+            &timestamp_query_pools[i]
+        );
+        cpu_frame_start_time[i] = std::chrono::steady_clock::now();
+    }
+    free_queries.resize(MAX_TIMER_COUNT);
+    std::iota(free_queries.begin(), free_queries.end(), 0u);
+}
+
+void context::deinit_timing()
+{
+    for(VkQueryPool pool: timestamp_query_pools)
+        vkDestroyQueryPool(dev->logical_device, pool, nullptr);
+    timestamp_query_pools.clear();
+    free_queries.clear();
+    timers.clear();
+    cpu_frame_start_time.clear();
+}
+
+void context::update_timing_results(uint32_t image_index)
+{
+    std::vector<uint64_t> results(MAX_TIMER_COUNT*2);
+    vkGetQueryPoolResults(
+        dev->logical_device,
+        timestamp_query_pools[image_index],
+        0, (uint32_t)results.size(),
+        results.size()*sizeof(uint64_t), results.data(),
+        0,
+        VK_QUERY_RESULT_64_BIT
+    );
+    timing_results.clear();
+
+    struct timestamp
+    {
+        uint64_t start, end;
+        std::string name;
+    };
+    std::vector<timestamp> tmp;
+    uint64_t min_start = UINT64_MAX, max_end = 0;
+    for(auto& pair: timers)
+    {
+        tmp.push_back({
+            results[pair.first*2],
+            results[pair.first*2+1],
+            pair.second
+        });
+        min_start = std::min(min_start, results[pair.first*2]);
+        max_end = std::max(max_end, results[pair.first*2+1]);
+    }
+    std::sort(
+        tmp.begin(), tmp.end(),
+        [](const timestamp& a, const timestamp& b){
+            return a.start < b.start;
+        }
+    );
+    tmp.push_back({
+        min_start,
+        max_end,
+        "GPU total"
+    });
+    tmp.push_back({
+        0,
+        (uint64_t)std::chrono::nanoseconds(
+            std::chrono::steady_clock::now() - cpu_frame_start_time[image_index]
+        ).count(),
+        "CPU total"
+    });
+
+    for(timestamp t: tmp)
+    {
+        timing_results.push_back({
+            t.name,
+            double(t.end-t.start)*1e-9
+        });
+    }
 }
