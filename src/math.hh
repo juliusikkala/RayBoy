@@ -172,6 +172,21 @@ struct aabb
     vec3 min;
     vec3 max;
 };
+struct frustum
+{
+    vec4 planes[6];
+};
+
+// Assumes affine transform!
+struct frustum operator*(const mat4& mat, const struct frustum& f);
+
+bool obb_frustum_intersection(
+    const aabb& box,
+    const mat4& transform,
+    const struct frustum& f
+);
+
+bool aabb_frustum_intersection(const aabb& box, const struct frustum& f);
 
 unsigned ravel_tex_coord(uvec3 p, uvec3 size);
 

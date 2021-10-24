@@ -14,7 +14,8 @@ struct material
     vec4 color_factor = vec4(1);
     sampler_tex color_texture = {nullptr, nullptr};
 
-    vec2 metallic_roughness_factor = vec2(0.0f, 1.0f);
+    float metallic_factor = 0.0f;
+    float roughness_factor = 1.0f;
     sampler_tex metallic_roughness_texture = {nullptr, nullptr};
 
     float normal_factor = 1.0f;

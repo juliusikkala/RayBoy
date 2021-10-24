@@ -474,6 +474,45 @@ unsigned calculate_mipmap_count(uvec2 size)
     return (unsigned)std::floor(std::log2(std::max(size.x, size.y)))+1u;
 }
 
+struct frustum operator*(const mat4& mat, const struct frustum& f)
+{
+    struct frustum res = f;
+    mat4 m = glm::transpose(glm::affineInverse(mat));
+    for(vec4& p: res.planes) p = m * p;
+    return res;
+}
+
+bool obb_frustum_intersection(
+    const aabb& box,
+    const mat4& transform,
+    const struct frustum& f
+){
+    struct frustum tf = f;
+    mat4 m = glm::transpose(transform);
+    for(vec4& p: tf.planes) p = m * p;
+    return aabb_frustum_intersection(box, tf);
+}
+
+bool aabb_frustum_intersection(const aabb& box, const struct frustum& f)
+{
+    for(vec4 p: f.planes)
+    {
+        if(
+            dot(p, vec4(box.min, 1.0f)) < 0 &&
+            dot(p, vec4(box.min.x, box.min.y, box.max.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.min.x, box.max.y, box.min.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.min.x, box.max.y, box.max.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.max.x, box.min.y, box.min.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.max.x, box.min.y, box.max.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.max.x, box.max.y, box.min.z, 1.0f)) < 0 &&
+            dot(p, vec4(box.max, 1.0f)) < 0
+        ) return false;
+    }
+
+    return true;
+}
+
+
 unsigned ravel_tex_coord(uvec3 p, uvec3 size)
 {
     return p.z * size.x * size.y + p.y * size.x + p.x;

@@ -42,6 +42,7 @@ add_subdirectory(external/volk)
 add_executable(rayboy
     external/vk_mem_alloc.cc
     external/stb_image.cc
+    external/tiny_gltf.cc
     src/main.cc
     src/context.cc
     src/device.cc
@@ -58,6 +59,14 @@ add_executable(rayboy
     src/mesh.cc
     src/material.cc
     src/texture.cc
+    src/model.cc
+    src/transformable.cc
+    src/animation.cc
+    src/ecs.cc
+    src/sampler.cc
+    src/light.cc
+    src/camera.cc
+    src/gltf.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

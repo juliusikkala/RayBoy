@@ -1,10 +1,13 @@
 #include "context.hh"
+#include "ecs.hh"
 #include "plain_render_pipeline.hh"
 #include <iostream>
 #include <memory>
 
 int main()
 {
+    ecs entities;
+    ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx;
     std::unique_ptr<render_pipeline> pipeline;
     pipeline.reset(new plain_render_pipeline(ctx));
@@ -35,6 +38,7 @@ int main()
         }
 
         //std::cout << counter++ << std::endl;
+        updater.update(entities);
         pipeline->render();
     }
 
