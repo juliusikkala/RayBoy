@@ -1,5 +1,6 @@
 #include "gltf.hh"
 #include "tiny_gltf.h"
+#include "helpers.hh"
 #include "stb_image.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
@@ -355,11 +356,26 @@ gltf_data load_gltf(context& ctx, const std::string& path, ecs& entities)
                 format = VK_FORMAT_R8G8B8_UNORM;
                 break;
             case 4:
-                format = VK_FORMAT_R8G8B8_UNORM;
+                format = VK_FORMAT_R8G8B8A8_UNORM;
                 break;
             }
 
             flip_vector_image(image.image, image.height);
+            if(image.component == 3)
+            {
+                assert(image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE);
+                std::vector<uint8_t> new_image(image.image.size()/3*4);
+                uint8_t fill = 1.0;
+                interlace(
+                    new_image.data(),
+                    image.image.data(),
+                    &fill,
+                    3, 4,
+                    image.width*image.height
+                );
+                image.image = std::move(new_image);
+                format = VK_FORMAT_R8G8B8A8_UNORM;
+            }
 
             md.textures.emplace_back(new texture(
                 ctx,
@@ -489,7 +505,7 @@ gltf_data load_gltf(context& ctx, const std::string& path, ecs& entities)
             texcoord.resize(position.size());
             tangent.resize(position.size());
 
-            std::vector<mesh::vertex> vertices;
+            std::vector<mesh::vertex> vertices(position.size());
             for(size_t i = 0; i < position.size(); ++i)
                 vertices[i] = {position[i], normal[i], texcoord[i], tangent[i]};
 
@@ -505,9 +521,8 @@ gltf_data load_gltf(context& ctx, const std::string& path, ecs& entities)
             {
                 std::cerr
                     << path << ": " << gltf_mesh.name
-                    << " uses a normal map but is missing tangent data. Please "
-                    << "export the asset with [Geometry > Tangents] ticked in "
-                    << "Blender." << std::endl;
+                    << " has a normal map but doesn't have tangents!"
+                    << std::endl;
             }
 
             md.meshes.emplace_back(new mesh(

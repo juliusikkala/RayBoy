@@ -185,7 +185,7 @@ vkres<VkImage> create_gpu_image(
         VK_SHARING_MODE_EXCLUSIVE,
         0,
         nullptr,
-        !data ? layout : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        VK_IMAGE_LAYOUT_UNDEFINED
     };
     VmaAllocationCreateInfo alloc_info = {};
     alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -198,11 +198,17 @@ vkres<VkImage> create_gpu_image(
         &alloc, nullptr
     );
 
+    VkCommandBuffer cmd = begin_command_buffer(ctx);
+
+    image_barrier(
+        cmd, img, VK_IMAGE_LAYOUT_UNDEFINED, 
+        !data ? layout : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    );
+
+    vkres<VkBuffer> buf;
     if(data)
     {
-        vkres<VkBuffer> buf = create_cpu_buffer(ctx, bytes, data);
-
-        VkCommandBuffer cmd = begin_command_buffer(ctx);
+        buf = create_cpu_buffer(ctx, bytes, data);
 
         VkBufferImageCopy copy = {
             0, 0, 0,
@@ -224,9 +230,9 @@ vkres<VkImage> create_gpu_image(
                 cmd, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
             );
         }
-
-        end_command_buffer(ctx, cmd);
     }
+
+    end_command_buffer(ctx, cmd);
 
     return vkres<VkImage>(ctx, img, alloc);
 }
@@ -438,4 +444,13 @@ void image_barrier(
         1, &image_barrier
     };
     vkCmdPipelineBarrier2KHR(cmd, &dependency_info);
+}
+
+void interlace(void* dst, const void* src, const void* fill, size_t src_stride, size_t dst_stride, size_t entries)
+{
+    for(size_t i = 0; i < entries; ++i)
+    {
+        memcpy((uint8_t*)dst+dst_stride*i, (uint8_t*)src+src_stride*i, src_stride);
+        memcpy((uint8_t*)dst+dst_stride*i+src_stride, fill, dst_stride-src_stride);
+    }
 }

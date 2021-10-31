@@ -78,4 +78,6 @@ void image_barrier(
     VkPipelineStageFlags2KHR stage_after = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
 );
 
+void interlace(void* dst, const void* src, const void* fill, size_t src_stride, size_t dst_stride, size_t entries);
+
 #endif

@@ -77,32 +77,20 @@ void texture::load_from_file(const std::string& path)
     {
         if(hdr)
         {
-            float* fdata = (float*)data;
             size_t new_data_size = size.x * size.y * 4 * sizeof(float);
             float* new_data = (float*)malloc(new_data_size);
-            for(size_t i = 0; i < size.x * size.y; ++i)
-            {
-                new_data[i*4+0] = fdata[i*3+0];
-                new_data[i*4+1] = fdata[i*3+1];
-                new_data[i*4+2] = fdata[i*3+2];
-                new_data[i*4+3] = 1.0;
-            }
+            float fill = 1.0;
+            interlace(new_data, data, &fill, 3 * sizeof(float), 4 * sizeof(float), size.x*size.y);
             free(data);
             data = new_data;
             data_size = new_data_size;
         }
         else
         {
-            uint8_t* udata = (uint8_t*)data;
             size_t new_data_size = size.x * size.y * 4 * sizeof(uint8_t);
             uint8_t* new_data = (uint8_t*)malloc(new_data_size);
-            for(size_t i = 0; i < size.x * size.y; ++i)
-            {
-                new_data[i*4+0] = udata[i*3+0];
-                new_data[i*4+1] = udata[i*3+1];
-                new_data[i*4+2] = udata[i*3+2];
-                new_data[i*4+3] = 255;
-            }
+            uint8_t fill = 255;
+            interlace(new_data, data, &fill, 3 * sizeof(uint8_t), 4 * sizeof(uint8_t), size.x*size.y);
             free(data);
             data = new_data;
             data_size = new_data_size;

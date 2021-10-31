@@ -1,4 +1,5 @@
 #include "context.hh"
+#include "gltf.hh"
 #include "ecs.hh"
 #include "plain_render_pipeline.hh"
 #include <iostream>
@@ -9,6 +10,9 @@ int main()
     ecs entities;
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx;
+
+    gltf_data gltf = load_gltf(ctx, "data/teapot_sponza.glb", entities);
+
     std::unique_ptr<render_pipeline> pipeline;
     pipeline.reset(new plain_render_pipeline(ctx, entities));
 
