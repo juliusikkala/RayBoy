@@ -8,43 +8,33 @@ class render_stage
 {
 public:
     render_stage(context& ctx);
-    ~render_stage();
+    virtual ~render_stage() = default;
 
-    VkSemaphore run(uint32_t image_index, VkSemaphore wait) const;
+    VkSemaphore run(uint32_t image_index, VkSemaphore wait);
 
 protected:
-    // General
-    void init_bindings(
-        size_t count,
-        const std::vector<VkDescriptorSetLayoutBinding>& bindings
-    );
-
-    void set_descriptor(
-        size_t set_index,
-        size_t binding_index,
-        std::vector<VkImageView> views,
-        std::vector<VkSampler> samplers = {}
-    );
-
+    virtual void update_buffers(uint32_t image_index);
 
     // Compute pipelines only:
-    void init_compute_pipeline(size_t bytes, const uint32_t* data);
-    VkCommandBuffer begin_compute_commands(size_t set_index);
-    void finish_compute_commands(VkCommandBuffer buf);
+    VkCommandBuffer compute_commands();
+    void use_compute_commands(VkCommandBuffer buf, uint32_t image_index);
+
+    // Graphics pipelines only:
+    VkCommandBuffer graphics_commands();
+    void use_graphics_commands(VkCommandBuffer buf, uint32_t image_index);
+
+    // General:
+    VkCommandBuffer commands(VkCommandPool pool);
+    void use_commands(VkCommandBuffer buf, VkCommandPool pool, uint32_t image_index);
 
     context* ctx;
 
 private:
     VkDescriptorSetLayoutBinding find_binding(size_t binding_index) const;
+    void ensure_semaphores(size_t count);
 
-    std::vector<vkres<VkCommandBuffer>> command_buffers;
-    vkres<VkPipeline> pipeline;
-    std::vector<VkDescriptorSet> descriptor_sets;
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    vkres<VkDescriptorSetLayout> descriptor_set_layout;
-    vkres<VkDescriptorPool> descriptor_pool;
-    vkres<VkPipelineLayout> pipeline_layout;
-    vkres<VkSemaphore> finished;
+    std::vector<std::vector<vkres<VkCommandBuffer>>> command_buffers;
+    std::vector<vkres<VkSemaphore>> finished;
 };
 
 #endif

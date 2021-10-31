@@ -53,6 +53,8 @@ add_executable(rayboy
     src/render_target.cc
     src/xor_render_stage.cc
     src/render_pipeline.cc
+    src/gpu_pipeline.cc
+    src/compute_pipeline.cc
     src/plain_render_pipeline.cc
     src/timer.cc
     src/math.cc
@@ -67,6 +69,7 @@ add_executable(rayboy
     src/light.cc
     src/camera.cc
     src/gltf.cc
+    src/gpu_buffer.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

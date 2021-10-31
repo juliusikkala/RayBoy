@@ -44,6 +44,8 @@ public:
     const VkCommandBuffer& operator*() const;
     operator VkCommandBuffer();
 
+    VkCommandPool get_pool() const;
+
 private:
     VkCommandBuffer value;
     VkCommandPool pool;
@@ -65,6 +67,8 @@ public:
 
     const VkBuffer& operator*() const;
     operator VkBuffer();
+
+    VmaAllocation get_allocation() const;
 
 private:
     VkBuffer buffer;

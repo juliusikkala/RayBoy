@@ -5,193 +5,89 @@
 render_stage::render_stage(context& ctx)
 : ctx(&ctx)
 {
-    // Create semaphore
-    finished = create_timeline_semaphore(ctx);
+    command_buffers.resize(ctx.get_image_count());
 }
 
-render_stage::~render_stage()
-{
-}
-
-VkSemaphore render_stage::run(uint32_t image_index, VkSemaphore wait) const
+VkSemaphore render_stage::run(uint32_t image_index, VkSemaphore wait)
 {
     uint64_t frame_counter = ctx->get_frame_counter();
+    VkSemaphore prev = wait;
 
-    VkSemaphoreSubmitInfoKHR wait_info = {
-        VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
-        wait, frame_counter, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0
-    };
-    VkCommandBufferSubmitInfoKHR command_info = {
-        VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR,
-        nullptr,
-        *command_buffers[image_index],
-        0
-    };
-    VkSemaphoreSubmitInfoKHR signal_info = {
-        VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
-        *finished, frame_counter, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0
-    };
-    VkSubmitInfo2KHR submit_info = {
-        VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
-        nullptr, 0,
-        1, &wait_info,
-        1, &command_info,
-        1, &signal_info
-    };
-    vkQueueSubmit2KHR(ctx->get_device().compute_queue, 1, &submit_info, VK_NULL_HANDLE);
+    update_buffers(image_index);
 
-    return *finished;
-}
-
-void render_stage::init_bindings(
-    size_t count, const std::vector<VkDescriptorSetLayoutBinding>& bindings
-){
-    this->bindings = bindings;
-    descriptor_set_layout = create_descriptor_set_layout(*ctx, bindings);
-
-    VkDevice logical_device = ctx->get_device().logical_device;
-
-    // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipeline_layout_info = {
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        nullptr, {},
-        1, &*descriptor_set_layout,
-        0, nullptr // TODO: Push constant support
-    };
-    VkPipelineLayout tmp_layout;
-    vkCreatePipelineLayout(
-        logical_device, &pipeline_layout_info, nullptr, &tmp_layout
-    );
-    pipeline_layout = vkres(*ctx, tmp_layout);
-
-    // Create descriptor pool
-    std::vector<VkDescriptorPoolSize> pool_sizes = calculate_descriptor_pool_sizes(
-        bindings.size(), bindings.data(), count
-    );
-    VkDescriptorPoolCreateInfo pool_create_info = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        nullptr,
-        0,
-        (uint32_t)count,
-        (uint32_t)pool_sizes.size(),
-        pool_sizes.data()
-    };
-    VkDescriptorPool tmp_pool;
-    vkCreateDescriptorPool(
-        logical_device, 
-        &pool_create_info,
-        nullptr,
-        &tmp_pool
-    );
-    descriptor_pool = vkres(*ctx, tmp_pool);
-
-    // Create descriptor sets
-    VkDescriptorSetAllocateInfo descriptor_alloc_info = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        nullptr,
-        descriptor_pool,
-        1,
-        &*descriptor_set_layout
-    };
-
-    descriptor_sets.resize(count);
-    for(size_t i = 0; i < descriptor_sets.size(); ++i)
+    for(size_t i = 0; i < command_buffers[image_index].size(); ++i)
     {
-        vkAllocateDescriptorSets(
-            logical_device,
-            &descriptor_alloc_info,
-            &descriptor_sets[i]
-        );
-    }
-}
+        const vkres<VkCommandBuffer>& cmd = command_buffers[image_index][i];
+        const vkres<VkSemaphore>& cur = finished[i];
 
-void render_stage::init_compute_pipeline(size_t bytes, const uint32_t* data)
-{
-    vkres<VkShaderModule> shader = load_shader(*ctx, bytes, data);
-    VkPipelineShaderStageCreateInfo shader_info = {
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        nullptr,
-        {},
-        VK_SHADER_STAGE_COMPUTE_BIT,
-        shader,
-        "main",
-        nullptr
-    };
-    VkComputePipelineCreateInfo pipeline_info = {
-        VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        nullptr,
-        {},
-        shader_info,
-        pipeline_layout,
-        VK_NULL_HANDLE,
-        0
-    };
-    VkPipeline pipeline;
-    vkCreateComputePipelines(
-        ctx->get_device().logical_device,
-        VK_NULL_HANDLE,
-        1,
-        &pipeline_info,
-        nullptr,
-        &pipeline
-    );
-    this->pipeline = vkres(*ctx, pipeline);
-}
-
-void render_stage::set_descriptor(
-    size_t set_index, size_t binding_index,
-    std::vector<VkImageView> views, std::vector<VkSampler> samplers
-){
-    VkDescriptorSetLayoutBinding bind = find_binding(binding_index);
-    std::vector<VkDescriptorImageInfo> image_infos(bind.descriptorCount);
-
-    assert(views.size() == bind.descriptorCount);
-
-    for(size_t i = 0; i < bind.descriptorCount; ++i)
-    {
-        VkSampler sampler = VK_NULL_HANDLE;
-        if(samplers.size() == 1)
-            sampler = samplers[0];
-        else if(samplers.size() > 1)
-        {
-            assert(samplers.size() == bind.descriptorCount);
-            sampler = samplers[i];
-        }
-        image_infos[i] = VkDescriptorImageInfo{
-            sampler,
-            views[i],
-            bind.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ?
-                VK_IMAGE_LAYOUT_GENERAL :
-                VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
+        bool compute = cmd.get_pool() == ctx->get_device().compute_pool;
+        VkSemaphoreSubmitInfoKHR wait_infos[2] = {
+            {
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
+                prev, frame_counter,
+                compute ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR : VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR,
+                0
+            },
+            {
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
+                *finished.back(), frame_counter-1,
+                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR,
+                0
+            }
         };
+        VkCommandBufferSubmitInfoKHR command_info = {
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR, nullptr, *cmd, 0
+        };
+        VkSemaphoreSubmitInfoKHR signal_info = {
+            VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
+            *cur, frame_counter,
+            compute ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
+            0
+        };
+        VkSubmitInfo2KHR submit_info = {
+            VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
+            nullptr, 0,
+            frame_counter != 0 && i == 0 ? 2u : 1u, wait_infos,
+            1, &command_info,
+            1, &signal_info
+        };
+        vkQueueSubmit2KHR(compute ? ctx->get_device().compute_queue : ctx->get_device().graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+        prev = *cur;
     }
-    VkWriteDescriptorSet write = {
-        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr,
-        descriptor_sets[set_index], (uint32_t)binding_index, 0,
-        bind.descriptorCount, bind.descriptorType,
-        image_infos.data(), nullptr, nullptr
-    };
-    vkUpdateDescriptorSets(ctx->get_device().logical_device, 1, &write, 0,  nullptr);
+
+    return prev;
 }
 
-VkDescriptorSetLayoutBinding render_stage::find_binding(size_t binding_index) const
+void render_stage::update_buffers(uint32_t)
 {
-    for(const VkDescriptorSetLayoutBinding& bind: bindings)
-    {
-        if(bind.binding == binding_index)
-        {
-            return bind;
-        }
-    }
-    assert(false && "Missing binding index");
 }
 
-VkCommandBuffer render_stage::begin_compute_commands(size_t set_index)
+VkCommandBuffer render_stage::compute_commands()
+{
+    return commands(ctx->get_device().compute_pool);
+}
+
+void render_stage::use_compute_commands(VkCommandBuffer buf, uint32_t image_index)
+{
+    use_commands(buf, ctx->get_device().compute_pool, image_index);
+}
+
+VkCommandBuffer render_stage::graphics_commands()
+{
+    return commands(ctx->get_device().graphics_pool);
+}
+
+void render_stage::use_graphics_commands(VkCommandBuffer buf, uint32_t image_index)
+{
+    use_commands(buf, ctx->get_device().graphics_pool, image_index);
+}
+
+VkCommandBuffer render_stage::commands(VkCommandPool pool)
 {
     VkCommandBufferAllocateInfo command_buffer_alloc_info = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         nullptr,
-        ctx->get_device().compute_pool,
+        pool,
         VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         1
     };
@@ -209,20 +105,18 @@ VkCommandBuffer render_stage::begin_compute_commands(size_t set_index)
     };
     vkBeginCommandBuffer(buf, &begin_info);
 
-    vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vkCmdBindDescriptorSets(
-        buf, 
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        *pipeline_layout,
-        0, 1, &descriptor_sets[set_index],
-        0, nullptr
-    );
-
     return buf;
 }
 
-void render_stage::finish_compute_commands(VkCommandBuffer buf)
+void render_stage::use_commands(VkCommandBuffer buf, VkCommandPool pool, uint32_t image_index)
 {
     vkEndCommandBuffer(buf);
-    command_buffers.emplace_back(*ctx, ctx->get_device().compute_pool, buf);
+    command_buffers[image_index].emplace_back(*ctx, pool, buf);
+    ensure_semaphores(command_buffers[image_index].size());
+}
+
+void render_stage::ensure_semaphores(size_t count)
+{
+    while(finished.size() < count)
+        finished.emplace_back(std::move(create_timeline_semaphore(*ctx)));
 }

@@ -92,7 +92,7 @@ vkres<VkShaderModule> load_shader(context& ctx, size_t bytes, const uint32_t* da
     return {ctx, mod};
 }   
 
-vkres<VkBuffer> create_gpu_buffer(context& ctx, size_t bytes, VkBufferUsageFlagBits usage)
+vkres<VkBuffer> create_gpu_buffer(context& ctx, size_t bytes, VkBufferUsageFlags usage)
 {
     VkBufferCreateInfo info = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,

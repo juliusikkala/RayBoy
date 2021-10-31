@@ -135,6 +135,11 @@ vkres<VkCommandBuffer>::operator VkCommandBuffer()
     return value;
 }
 
+VkCommandPool vkres<VkCommandBuffer>::get_pool() const
+{
+    return pool;
+}
+
 vkres<VkBuffer>::vkres()
 : buffer(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE), ctx(nullptr)
 {
@@ -192,6 +197,11 @@ const VkBuffer& vkres<VkBuffer>::operator*() const
 vkres<VkBuffer>::operator VkBuffer()
 {
     return buffer;
+}
+
+VmaAllocation vkres<VkBuffer>::get_allocation() const
+{
+    return allocation;
 }
 
 vkres<VkImage>::vkres()
