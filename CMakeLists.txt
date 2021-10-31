@@ -72,6 +72,7 @@ add_executable(rayboy
     src/gpu_buffer.cc
     src/scene.cc
     src/scene_update_render_stage.cc
+    src/graphics_pipeline.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

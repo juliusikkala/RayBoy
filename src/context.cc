@@ -112,7 +112,7 @@ render_target context::get_render_target() const
         frames[i].view = *swapchain_image_views[i];
         frames[i].layout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
-    return render_target(frames);
+    return render_target(frames, uvec2(size), VK_SAMPLE_COUNT_1_BIT, surface_format.format);
 }
 
 const std::vector<VkImage>& context::get_images() const

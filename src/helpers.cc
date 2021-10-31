@@ -75,6 +75,8 @@ void wait_timeline_semaphore(context& ctx, VkSemaphore sem, uint64_t wait_value)
 
 vkres<VkShaderModule> load_shader(context& ctx, size_t bytes, const uint32_t* data)
 {
+    if(bytes == 0) return {};
+
     VkShaderModuleCreateInfo create_info{
         VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         nullptr,

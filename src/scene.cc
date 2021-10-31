@@ -81,11 +81,13 @@ bool scene::update(uint32_t image_index)
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
         e->foreach([&](entity id, transformable& t, model& m) {
+            mat4 mat = t.get_global_transform();
+            mat4 inv = inverseTranspose(mat);
             for(const model::vertex_group& group: m)
             {
                 gpu_instance& inst = data[i++];
-                inst.model_to_world = t.get_global_transform();
-                inst.normal_to_world = inverseTranspose(inst.model_to_world);
+                inst.model_to_world = mat;
+                inst.normal_to_world = inv;
                 inst.material.color_factor = group.mat.color_factor;
                 inst.material.metallic_roughness_normal_ior_factors = vec4(
                     group.mat.metallic_factor,
