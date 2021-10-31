@@ -6,13 +6,25 @@ gpu_buffer::gpu_buffer(
     size_t bytes,
     VkBufferUsageFlags usage,
     bool single_gpu_buffer
-): ctx(&ctx), bytes(bytes)
+): ctx(&ctx), bytes(0), single_gpu_buffer(single_gpu_buffer), usage(usage)
 {
-    size_t buf_count = single_gpu_buffer ? 1 : ctx.get_image_count();
+    resize(bytes);
+}
+
+bool gpu_buffer::resize(size_t size)
+{
+    if(this->bytes >= size) return false;
+
+    this->bytes = size;
+    buffers.clear();
+    staging_buffers.clear();
+
+    size_t buf_count = single_gpu_buffer ? 1 : ctx->get_image_count();
     for(size_t i = 0; i < buf_count; ++i)
-        buffers.emplace_back(create_gpu_buffer(ctx, bytes, usage|VK_BUFFER_USAGE_TRANSFER_DST_BIT));
-    for(size_t i = 0; i < ctx.get_image_count(); ++i)
-        staging_buffers.emplace_back(create_cpu_buffer(ctx, bytes));
+        buffers.emplace_back(create_gpu_buffer(*ctx, bytes, usage|VK_BUFFER_USAGE_TRANSFER_DST_BIT));
+    for(size_t i = 0; i < ctx->get_image_count(); ++i)
+        staging_buffers.emplace_back(create_cpu_buffer(*ctx, bytes));
+    return true;
 }
 
 VkBuffer gpu_buffer::operator[](uint32_t image_index) const
@@ -22,6 +34,8 @@ VkBuffer gpu_buffer::operator[](uint32_t image_index) const
 
 void gpu_buffer::update(uint32_t image_index, const void* data, size_t bytes)
 {
+    if(staging_buffers.size() == 0) return;
+
     if(bytes == 0 || bytes > this->bytes)
         bytes = this->bytes;
 
@@ -35,8 +49,11 @@ void gpu_buffer::update(uint32_t image_index, const void* data, size_t bytes)
 
 void gpu_buffer::upload(VkCommandBuffer cmd, uint32_t image_index)
 {
-    VkBuffer target = operator[](image_index);
-    VkBuffer source = staging_buffers[image_index];
-    VkBufferCopy copy = {0, 0, bytes};
-    vkCmdCopyBuffer(cmd, source, target, 1, &copy);
+    if(buffers.size() > 0)
+    {
+        VkBuffer target = operator[](image_index);
+        VkBuffer source = staging_buffers[image_index];
+        VkBufferCopy copy = {0, 0, bytes};
+        vkCmdCopyBuffer(cmd, source, target, 1, &copy);
+    }
 }

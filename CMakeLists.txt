@@ -70,6 +70,8 @@ add_executable(rayboy
     src/camera.cc
     src/gltf.cc
     src/gpu_buffer.cc
+    src/scene.cc
+    src/scene_update_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

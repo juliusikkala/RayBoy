@@ -77,6 +77,7 @@ public:
     quat get_global_orientation() const;
     vec3 get_global_orientation_euler() const;
     vec3 get_global_scaling() const;
+    vec3 get_global_direction(vec3 reference = vec3(0,0,-1)) const;
 
     void set_global_orientation(float angle, vec3 axis);
     void set_global_orientation(float pitch, float yaw, float roll = 0);

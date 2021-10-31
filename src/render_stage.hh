@@ -26,6 +26,7 @@ protected:
     // General:
     VkCommandBuffer commands(VkCommandPool pool);
     void use_commands(VkCommandBuffer buf, VkCommandPool pool, uint32_t image_index);
+    void clear_commands();
 
     context* ctx;
 

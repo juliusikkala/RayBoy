@@ -10,7 +10,7 @@ int main()
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx;
     std::unique_ptr<render_pipeline> pipeline;
-    pipeline.reset(new plain_render_pipeline(ctx));
+    pipeline.reset(new plain_render_pipeline(ctx, entities));
 
     bool running = true;
     unsigned counter = 0;

@@ -12,10 +12,13 @@ class gpu_buffer
 public:
     gpu_buffer(
         context& ctx,
-        size_t bytes,
+        size_t bytes = 0,
         VkBufferUsageFlags usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         bool single_gpu_buffer = true
     );
+
+    // Returns true if the resize truly occurred
+    bool resize(size_t size);
 
     VkBuffer operator[](uint32_t image_index) const;
 
@@ -29,6 +32,8 @@ public:
 protected:
     context* ctx;
     size_t bytes;
+    bool single_gpu_buffer;
+    VkBufferUsageFlags usage;
     std::vector<vkres<VkBuffer>> buffers;
     std::vector<vkres<VkBuffer>> staging_buffers;
 };
@@ -36,6 +41,8 @@ protected:
 template<typename T, typename F>
 void gpu_buffer::update(uint32_t image_index, F&& f)
 {
+    if(staging_buffers.size() == 0) return;
+
     T* dst = nullptr;
     vkres<VkBuffer>& staging = staging_buffers[image_index];
     const VmaAllocator& allocator = ctx->get_device().allocator;

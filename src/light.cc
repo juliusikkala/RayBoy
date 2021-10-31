@@ -28,31 +28,6 @@ directional_light::directional_light(vec3 color)
 {
 }
 
-point_light::point_light(vec3 color, float cutoff_brightness)
-: light(color), cutoff_brightness(cutoff_brightness) {}
-
-void point_light::set_cutoff_brightness(float cutoff_brightness)
-{
-    this->cutoff_brightness = cutoff_brightness;
-}
-
-float point_light::get_cutoff_brightness() const
-{
-    return cutoff_brightness;
-}
-
-void point_light::set_cutoff_radius(float cutoff_radius)
-{
-    vec3 c = get_color();
-    cutoff_brightness = max(max(c.x, c.y), c.z)/(cutoff_radius*cutoff_radius);
-}
-
-float point_light::get_cutoff_radius() const
-{
-    vec3 radius2 = get_color()/cutoff_brightness;
-    return sqrt(max(max(radius2.x, radius2.y), radius2.z));
-}
-
 spotlight::spotlight(
     vec3 color,
     float cutoff_angle,

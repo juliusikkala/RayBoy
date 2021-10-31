@@ -27,15 +27,10 @@ public:
 class point_light: public light
 {
 public:
-    point_light(
-        vec3 color = vec3(1.0),
-        float cutoff_brightness = 5.0f/256.0f
-    );
+    using light::light;
 
     void set_cutoff_brightness(float cutoff_brightness = 5.0f/256.0f);
     float get_cutoff_brightness() const;
-    void set_cutoff_radius(float cutoff_radius);
-    float get_cutoff_radius() const;
 
 private:
     float cutoff_brightness;

@@ -43,12 +43,12 @@ xor_render_stage::xor_render_stage(context& ctx, render_target& target)
 
         // Record command buffer
         VkCommandBuffer buf = compute_commands();
+        stage_timer.start(buf, i);
 
         uniforms.upload(buf, i);
         xor_pipeline.bind(buf, i);
         xor_pipeline.push_constants(buf, &pc);
 
-        stage_timer.start(buf, i);
         target.transition_layout(buf, i, VK_IMAGE_LAYOUT_GENERAL);
 
         ivec2 size = ctx.get_size();

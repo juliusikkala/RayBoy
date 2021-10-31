@@ -233,6 +233,11 @@ vec3 transformable::get_global_scaling() const
     return get_matrix_scaling(get_global_transform());
 }
 
+vec3 transformable::get_global_direction(vec3 reference) const
+{
+    return normalize(get_global_orientation() * reference);
+}
+
 void transformable::set_global_orientation(float angle, vec3 axis)
 {
     set_global_orientation(angleAxis(radians(angle), normalize(axis)));

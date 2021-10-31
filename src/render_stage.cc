@@ -115,6 +115,12 @@ void render_stage::use_commands(VkCommandBuffer buf, VkCommandPool pool, uint32_
     ensure_semaphores(command_buffers[image_index].size());
 }
 
+void render_stage::clear_commands()
+{
+    for(auto& cmds: command_buffers)
+        cmds.clear();
+}
+
 void render_stage::ensure_semaphores(size_t count)
 {
     while(finished.size() < count)
