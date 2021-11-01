@@ -15,6 +15,8 @@ public:
         const std::vector<VkDescriptorSetLayoutBinding>& bindings,
         size_t push_constant_size = 0
     );
+
+    void bind(VkCommandBuffer buf, size_t set_index);
 };
 
 #endif

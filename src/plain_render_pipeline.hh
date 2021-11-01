@@ -3,6 +3,7 @@
 
 #include "render_pipeline.hh"
 #include "scene_update_render_stage.hh"
+#include "forward_render_stage.hh"
 #include "xor_render_stage.hh"
 
 class plain_render_pipeline: public render_pipeline
@@ -18,6 +19,7 @@ protected:
 private:
     ecs* entities;
     std::unique_ptr<scene_update_render_stage> scene_update_stage;
+    std::unique_ptr<forward_render_stage> forward_stage;
     std::unique_ptr<xor_render_stage> xor_stage;
 };
 

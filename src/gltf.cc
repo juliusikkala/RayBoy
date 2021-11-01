@@ -54,7 +54,7 @@ template<typename T>
 vec4 vector_to_vec4(const std::vector<T>& v, float fill_value = 0.0f)
 {
     vec4 ret(fill_value);
-    for(size_t i = 0; i < 4; ++i)
+    for(size_t i = 0; i < std::min(4lu, v.size()); ++i)
         ret[i] = v[i];
     return ret;
 }

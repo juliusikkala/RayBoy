@@ -362,12 +362,15 @@ VkCommandBuffer begin_command_buffer(context& ctx)
 void end_command_buffer(context& ctx, VkCommandBuffer buf)
 {
     vkEndCommandBuffer(buf);
+    VkCommandBufferSubmitInfoKHR submit_info = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR, nullptr, buf, 0
+    };
     VkSubmitInfo2KHR info = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
         nullptr,
         0,
         0, nullptr,
-        0, nullptr,
+        1, &submit_info,
         0, nullptr
     };
     vkQueueSubmit2KHR(ctx.get_device().graphics_queue, 1, &info, VK_NULL_HANDLE);

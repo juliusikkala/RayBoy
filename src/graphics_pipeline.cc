@@ -1,7 +1,7 @@
 #include "graphics_pipeline.hh"
 #include "mesh.hh"
 #include "helpers.hh"
-    
+
 graphics_pipeline::params::params(const std::vector<render_target*>& targets)
 : targets(targets)
 {
@@ -86,6 +86,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
     );
 
     attachments = std::vector<VkAttachmentDescription>(targets.size());
+    clear_values = std::vector<VkClearValue>(targets.size());
     for(size_t i = 0; i < targets.size(); ++i)
     {
         attachments[i] = VkAttachmentDescription{
@@ -96,9 +97,19 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
             VK_ATTACHMENT_STORE_OP_STORE,
             VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            targets[i]->get_layout(),
-            targets[i]->get_layout()
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
         };
+        VkClearValue clear;
+        if(targets[i]->is_depth_stencil())
+        {
+            clear.depthStencil = {1.0f, 0};
+        }
+        else
+        {
+            clear.color = {0.0f, 0.0f, 0.0f, 0.0f};
+        }
+        clear_values.push_back(clear);
     }
 }
 
@@ -178,7 +189,7 @@ void graphics_pipeline::init(
     };
 
     VkSubpassDependency subpass_dependency = {
-        VK_SUBPASS_EXTERNAL, VK_SUBPASS_EXTERNAL,
+        VK_SUBPASS_EXTERNAL, 0,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         0,
@@ -238,4 +249,65 @@ void graphics_pipeline::init(
         &pipeline
     );
     this->pipeline = vkres(*ctx, pipeline);
+
+    uvec2 size = p.targets[0]->get_size();
+
+    std::vector<VkImageView> image_views(p.targets.size());
+    for(uint32_t i = 0; i < ctx->get_image_count(); ++i)
+    {
+        for(uint32_t j = 0; j < p.targets.size(); ++j)
+        {
+            image_views[j] = (*p.targets[j])[i].view;
+        }
+        VkFramebufferCreateInfo framebuffer_info = {
+            VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            nullptr,
+            0,
+            render_pass,
+            (uint32_t)image_views.size(),
+            image_views.data(),
+            size.x,
+            size.y,
+            1
+        };
+        VkFramebuffer fb;
+        vkCreateFramebuffer(ctx->get_device().logical_device, &framebuffer_info, nullptr, &fb);
+        framebuffers.emplace_back(*ctx, fb);
+    }
+
+    create_params = p;
+}
+
+void graphics_pipeline::begin_render_pass(
+    VkCommandBuffer buf,
+    uint32_t image_index
+){
+    uvec2 size = create_params.targets[0]->get_size();
+    VkRenderPassBeginInfo render_pass_info = {
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        nullptr,
+        render_pass,
+        framebuffers[image_index],
+        {{0,0}, {size.x, size.y}},
+        (uint32_t)create_params.clear_values.size(),
+        create_params.clear_values.data()
+    };
+    vkCmdBeginRenderPass(buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void graphics_pipeline::end_render_pass(VkCommandBuffer buf)
+{
+    vkCmdEndRenderPass(buf);
+}
+
+void graphics_pipeline::bind(VkCommandBuffer buf, size_t set_index)
+{
+    vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindDescriptorSets(
+        buf,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        *pipeline_layout,
+        0, 1, &descriptor_sets[set_index],
+        0, nullptr
+    );
 }

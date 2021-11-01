@@ -105,7 +105,7 @@ void gpu_pipeline::set_descriptor(
             views[i],
             bind.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ?
                 VK_IMAGE_LAYOUT_GENERAL :
-                VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         };
     }
     VkWriteDescriptorSet write = {
@@ -120,30 +120,20 @@ void gpu_pipeline::set_descriptor(
 void gpu_pipeline::set_descriptor(
     size_t set_index,
     size_t binding_index,
-    VkBuffer buffer
+    std::vector<VkBuffer> buffers
 ){
     VkDescriptorSetLayoutBinding bind = find_binding(binding_index);
-    VkDescriptorBufferInfo info = {buffer, 0, VK_WHOLE_SIZE};
+    std::vector<VkDescriptorBufferInfo> infos(buffers.size());
+    for(size_t i = 0; i < buffers.size(); ++i)
+        infos[i] = {buffers[i], 0, VK_WHOLE_SIZE};
 
     VkWriteDescriptorSet write = {
         VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr,
         descriptor_sets[set_index], (uint32_t)binding_index, 0,
-        1, bind.descriptorType,
-        nullptr, &info, nullptr
+        (uint32_t )infos.size(), bind.descriptorType,
+        nullptr, infos.data(), nullptr
     };
     vkUpdateDescriptorSets(ctx->get_device().logical_device, 1, &write, 0,  nullptr);
-}
-
-void gpu_pipeline::bind(VkCommandBuffer buf, size_t set_index)
-{
-    vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vkCmdBindDescriptorSets(
-        buf,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        *pipeline_layout,
-        0, 1, &descriptor_sets[set_index],
-        0, nullptr
-    );
 }
 
 void gpu_pipeline::push_constants(VkCommandBuffer buf, const void* data)

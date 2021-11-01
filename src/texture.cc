@@ -133,7 +133,7 @@ void texture::load_from_data(size_t data_size, void* data)
 {
     image = create_gpu_image(
         *ctx, size, format, layout, samples, tiling,
-        usage, data_size, data, false
+        usage, data_size, data, data != nullptr
     );
     view = create_image_view(*ctx, image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 }

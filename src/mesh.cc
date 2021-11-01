@@ -56,3 +56,11 @@ bool mesh::is_opaque() const
 {
     return opaque;
 }
+
+void mesh::draw(VkCommandBuffer buf) const
+{
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(buf, 0, 1, &*vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(buf, *index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(buf, indices.size(), 1, 0, 0, 0);
+}

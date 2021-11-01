@@ -20,6 +20,7 @@ public:
 
     struct params
     {
+        params() = default;
         params(const std::vector<render_target*>& targets);
 
         std::vector<render_target*> targets;
@@ -36,6 +37,7 @@ public:
 
         std::vector<VkPipelineColorBlendAttachmentState> blend_states;
         std::vector<VkAttachmentDescription> attachments;
+        std::vector<VkClearValue> clear_values;
     };
 
     void init(
@@ -46,8 +48,15 @@ public:
         size_t push_constant_size = 0
     );
 
+    void begin_render_pass(VkCommandBuffer buf, uint32_t image_index);
+    void end_render_pass(VkCommandBuffer buf);
+
+    void bind(VkCommandBuffer buf, size_t set_index);
+
 private:
+    params create_params;
     vkres<VkRenderPass> render_pass;
+    std::vector<vkres<VkFramebuffer>> framebuffers;
 };
 
 #endif

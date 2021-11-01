@@ -27,14 +27,10 @@ public:
     void set_descriptor(
         size_t set_index,
         size_t binding_index,
-        VkBuffer buffer
+        std::vector<VkBuffer> buffer
     );
 
-    void bind(VkCommandBuffer buf, size_t set_index);
     void push_constants(VkCommandBuffer buf, const void* data);
-
-    // Compute pipelines only:
-    void init_compute_pipeline(size_t bytes, const uint32_t* data);
 
     context* ctx;
 

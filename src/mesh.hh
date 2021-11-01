@@ -33,6 +33,8 @@ public:
     void set_opaque(bool opaque);
     bool is_opaque() const;
 
+    void draw(VkCommandBuffer buf) const;
+
     static constexpr VkVertexInputBindingDescription bindings[] = {
         {0, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX}
     };

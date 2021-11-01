@@ -23,7 +23,7 @@ xor_render_stage::xor_render_stage(context& ctx, render_target& target)
 {
     // Create pipeline
     xor_pipeline.init(
-        sizeof(xor_shader_binary), xor_shader_binary,
+        sizeof(xor_comp_shader_binary), xor_comp_shader_binary,
         ctx.get_image_count(), 
         {
             {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -39,7 +39,7 @@ xor_render_stage::xor_render_stage(context& ctx, render_target& target)
     {
         // Assign descriptors
         xor_pipeline.set_descriptor(i, 0, {target[i].view});
-        xor_pipeline.set_descriptor(i, 1, uniforms[i]);
+        xor_pipeline.set_descriptor(i, 1, {uniforms[i]});
 
         // Record command buffer
         VkCommandBuffer buf = compute_commands();

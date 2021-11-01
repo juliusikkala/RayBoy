@@ -40,3 +40,15 @@ void compute_pipeline::init(
     );
     this->pipeline = vkres(*ctx, pipeline);
 }
+
+void compute_pipeline::bind(VkCommandBuffer buf, size_t set_index)
+{
+    vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindDescriptorSets(
+        buf,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        *pipeline_layout,
+        0, 1, &descriptor_sets[set_index],
+        0, nullptr
+    );
+}

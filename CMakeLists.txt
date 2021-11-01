@@ -14,15 +14,20 @@ add_subdirectory(external/Vulkan-Loader)
 
 set(shader_src
     src/xor.comp
+    src/forward.vert
+    src/forward.frag
     # Add more shader sources here
 )
 set(shader_binary
     xor.comp.h
+    forward.vert.h
+    forward.frag.h
     # Add more shader binaries here
 )
 
 foreach(src binary IN ZIP_LISTS shader_src shader_binary)
-    get_filename_component(shader_bin_name ${shader_binary} NAME_WE)
+    get_filename_component(shader_bin_name ${src} NAME)
+    string(REPLACE "\." "_" shader_bin_name ${shader_bin_name})
     add_custom_command(
         OUTPUT ${binary}
         COMMAND glslangValidator --target-env vulkan1.2 --iy --vn ${shader_bin_name}_shader_binary ${CMAKE_CURRENT_SOURCE_DIR}/${src} -o ${binary}
@@ -73,6 +78,7 @@ add_executable(rayboy
     src/scene.cc
     src/scene_update_render_stage.cc
     src/graphics_pipeline.cc
+    src/forward_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
