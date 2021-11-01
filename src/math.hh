@@ -6,6 +6,7 @@
 #define GLM_FORCE_INTRINSICS
 #define GLM_FORCE_SSE2
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/transform.hpp>
@@ -24,7 +25,7 @@
 #include <complex>
 
 #if GLM_VERSION != 998
-#pragma warning "This program was written to use GLM 0.9.9.9. " \
+#pragma warning "This program was written to use GLM 0.9.9.8. " \
     GLM_VERSION_MESSAGE
 #endif
 

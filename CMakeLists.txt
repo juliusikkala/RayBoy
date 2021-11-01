@@ -30,7 +30,7 @@ foreach(src binary IN ZIP_LISTS shader_src shader_binary)
     string(REPLACE "\." "_" shader_bin_name ${shader_bin_name})
     add_custom_command(
         OUTPUT ${binary}
-        COMMAND glslangValidator --target-env vulkan1.2 --iy --vn ${shader_bin_name}_shader_binary ${CMAKE_CURRENT_SOURCE_DIR}/${src} -o ${binary}
+        COMMAND glslangValidator --target-env vulkan1.2 --vn ${shader_bin_name}_shader_binary ${CMAKE_CURRENT_SOURCE_DIR}/${src} -o ${binary}
         MAIN_DEPENDENCY ${src}
         IMPLICIT_DEPENDS C ${src}
     )

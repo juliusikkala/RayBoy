@@ -24,7 +24,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
     };
 
     uvec2 size = targets[0]->get_size();
-    viewport = {0.f, 0.f, float(size.x), float(size.y), 0.f, 1.f};
+    viewport = {0.f, float(size.y), float(size.x), -float(size.y), 0.f, 1.f};
     scissor = {{0, 0}, {size.x, size.y}};
 
     rasterization_info = {

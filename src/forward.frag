@@ -21,6 +21,8 @@ layout(location = 0) out vec4 color;
 void main()
 {
     instance i = instances.array[pc.instance_id];
+    camera cam = cameras.array[pc.camera_id];
+
     material mat = sample_material(i.material, gl_FrontFacing, uv, normal, tangent, bitangent);
     color = mat.color;
 }

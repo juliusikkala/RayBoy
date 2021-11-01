@@ -11,7 +11,11 @@ int main()
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx;
 
-    gltf_data gltf = load_gltf(ctx, "data/teapot_sponza.glb", entities);
+    gltf_data gltf = load_gltf(ctx, "data/testi.glb", entities);
+
+    uvec2 size = ctx.get_size();
+    float aspect = size.x/float(size.y);
+    entities([&](entity id, camera& cam){cam.set_aspect(aspect);});
 
     std::unique_ptr<render_pipeline> pipeline;
     pipeline.reset(new plain_render_pipeline(ctx, entities));

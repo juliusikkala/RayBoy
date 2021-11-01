@@ -1369,7 +1369,7 @@ template<typename... DependencyComponents>
 void dependency_components<DependencyComponents...>::
 ensure_dependency_components_exist(entity id, ecs& ctx)
 {
-    (ctx.attach(id, DependencyComponents()), ...);
+    ((ctx.has<DependencyComponents>(id) ? void() : ctx.attach(id, DependencyComponents())), ...);
 }
 
 template<typename... DependencySystems>
