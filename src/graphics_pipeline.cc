@@ -103,13 +103,15 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         VkClearValue clear;
         if(targets[i]->is_depth_stencil())
         {
+            attachments[i].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+            attachments[i].finalLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
             clear.depthStencil = {1.0f, 0};
         }
         else
         {
-            clear.color = {0.0f, 0.0f, 0.0f, 0.0f};
+            clear.color = {1.0f, 0.0f, 0.0f, 1.0f};
         }
-        clear_values.push_back(clear);
+        clear_values[i] = clear;
     }
 }
 
@@ -196,6 +198,12 @@ void graphics_pipeline::init(
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         0
     };
+    if(!depth_stencil.empty())
+    {
+        subpass_dependency.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        subpass_dependency.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        subpass_dependency.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
 
     VkRenderPass tmp_render_pass;
     VkRenderPassCreateInfo render_pass_info = {

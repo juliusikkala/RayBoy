@@ -38,6 +38,7 @@ vkres<VkImage> create_gpu_image(
 void generate_mipmaps(
     VkCommandBuffer cmd,
     VkImage img,
+    VkFormat format,
     uvec2 size,
     VkImageLayout before,
     VkImageLayout after
@@ -68,6 +69,7 @@ std::vector<VkDescriptorPoolSize> calculate_descriptor_pool_sizes(
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
+    VkFormat format,
     VkImageLayout layout_before,
     VkImageLayout layout_after,
     uint32_t mip_level = 0,
@@ -79,5 +81,7 @@ void image_barrier(
 );
 
 void interlace(void* dst, const void* src, const void* fill, size_t src_stride, size_t dst_stride, size_t entries);
+
+VkImageAspectFlags deduce_image_aspect_flags(VkFormat format);
 
 #endif

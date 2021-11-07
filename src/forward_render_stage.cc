@@ -15,7 +15,8 @@ struct push_constants
 
 forward_render_stage::forward_render_stage(
     context& ctx,
-    render_target& target,
+    render_target* color_target,
+    render_target* depth_target,
     const scene& s,
     entity cam_id
 ): render_stage(ctx), gfx(ctx), stage_timer(ctx, "forward_render_stage")
@@ -28,8 +29,12 @@ forward_render_stage::forward_render_stage(
     sd.fragment_bytes = sizeof(forward_frag_shader_binary);
     sd.fragment_data = forward_frag_shader_binary;
 
+    std::vector<render_target*> targets;
+    if(color_target) targets.push_back(color_target);
+    if(depth_target) targets.push_back(depth_target);
+
     gfx.init(
-        graphics_pipeline::params({&target}),
+        graphics_pipeline::params(targets),
         sd,
         ctx.get_image_count(), 
         s.get_bindings(),

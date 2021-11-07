@@ -31,7 +31,7 @@ public:
     void draw_instance(VkCommandBuffer buf, size_t instance_id) const;
 
 private:
-    int32_t get_st_index(material::sampler_tex st);
+    int32_t get_st_index(material::sampler_tex st, uint32_t image_index);
     friend class scene_change_handler;
 
     ecs* e;

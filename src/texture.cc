@@ -24,9 +24,33 @@ texture::texture(
     load_from_data(data_size, data);
 }
 
-VkImageView texture::get_image_view() const { return *view; }
+VkImageView texture::get_image_view(uint32_t image_index) const
+{
+    return *views[min((size_t)image_index, views.size()-1)];
+}
 
-VkImage texture::get_image() const { return *image; }
+VkImage texture::get_image(uint32_t image_index) const
+{
+    return *images[min((size_t)image_index, views.size()-1)];
+}
+
+render_target texture::get_render_target() const
+{
+    assert((usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0);
+
+    std::vector<render_target::frame> frames(images.size());
+
+    for(size_t i = 0; i < images.size(); ++i)
+        frames[i] = {*images[i], *views[i], layout};
+
+    return render_target(
+        frames,
+        size,
+        samples,
+        format
+    );
+}
+
 VkFormat texture::get_format() const { return format; }
 VkSampleCountFlagBits texture::get_samples() const { return samples; }
 
@@ -120,20 +144,29 @@ void texture::load_from_file(const std::string& path)
     layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     samples = VK_SAMPLE_COUNT_1_BIT;
 
-    image = create_gpu_image(
+    images.emplace_back(create_gpu_image(
         *ctx, size, format, layout, samples,
         tiling, usage, data_size, data, true
-    );
+    ));
 
     stbi_image_free(data);
-    view = create_image_view(*ctx, image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    views.emplace_back(create_image_view(*ctx, images[0], format, VK_IMAGE_ASPECT_COLOR_BIT));
 }
 
 void texture::load_from_data(size_t data_size, void* data)
 {
-    image = create_gpu_image(
-        *ctx, size, format, layout, samples, tiling,
-        usage, data_size, data, data != nullptr
-    );
-    view = create_image_view(*ctx, image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    size_t count = 1;
+    if((usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0)
+    {
+        count = ctx->get_image_count();
+    }
+
+    for(size_t i = 0; i < count; ++i)
+    {
+        images.emplace_back(create_gpu_image(
+            *ctx, size, format, layout, samples, tiling,
+            usage, data_size, data, data != nullptr
+        ));
+        views.emplace_back(create_image_view(*ctx, images[i], format, deduce_image_aspect_flags(format)));
+    }
 }

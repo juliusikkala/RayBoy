@@ -1,6 +1,7 @@
 #ifndef RAYBOY_TEXTURE_HH
 #define RAYBOY_TEXTURE_HH
 #include "context.hh"
+#include "render_target.hh"
 
 class texture
 {
@@ -20,9 +21,10 @@ public:
     texture(const context& other) = delete;
     texture(texture&& other) = default;
 
-    VkImageView get_image_view() const;
+    VkImageView get_image_view(uint32_t image_index) const;
+    VkImage get_image(uint32_t image_index) const;
+    render_target get_render_target() const;
 
-    VkImage get_image() const;
     VkFormat get_format() const;
     VkSampleCountFlagBits get_samples() const;
 
@@ -38,8 +40,8 @@ private:
     context* ctx;
 
     uvec2 size;
-    vkres<VkImage> image;
-    vkres<VkImageView> view;
+    std::vector<vkres<VkImage>> images;
+    std::vector<vkres<VkImageView>> views;
     VkFormat format;
     VkImageTiling tiling;
     VkImageUsageFlags usage;

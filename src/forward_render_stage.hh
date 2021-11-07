@@ -13,7 +13,8 @@ class forward_render_stage: public render_stage
 public:
     forward_render_stage(
         context& ctx,
-        render_target& target,
+        render_target* color_target,
+        render_target* depth_target,
         const scene& s,
         entity cam_id
     );

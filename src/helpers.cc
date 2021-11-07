@@ -203,7 +203,7 @@ vkres<VkImage> create_gpu_image(
     VkCommandBuffer cmd = begin_command_buffer(ctx);
 
     image_barrier(
-        cmd, img, VK_IMAGE_LAYOUT_UNDEFINED, 
+        cmd, img, format, VK_IMAGE_LAYOUT_UNDEFINED, 
         !data ? layout : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     );
 
@@ -214,7 +214,7 @@ vkres<VkImage> create_gpu_image(
 
         VkBufferImageCopy copy = {
             0, 0, 0,
-            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {deduce_image_aspect_flags(format), 0, 0, 1},
             {0, 0, 0},
             {size.x, size.y, 1}
         };
@@ -224,12 +224,12 @@ vkres<VkImage> create_gpu_image(
 
         if(mipmapped)
             generate_mipmaps(
-                cmd, img, size, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
+                cmd, img, format, size, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
             );
         else
         {
             image_barrier(
-                cmd, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
+                cmd, img, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout
             );
         }
     }
@@ -242,6 +242,7 @@ vkres<VkImage> create_gpu_image(
 void generate_mipmaps(
     VkCommandBuffer cmd,
     VkImage img,
+    VkFormat format,
     uvec2 size,
     VkImageLayout before,
     VkImageLayout after
@@ -250,14 +251,14 @@ void generate_mipmaps(
     if(before != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
         image_barrier(
-            cmd, img, before, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            cmd, img, format, before, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
         );
     }
 
     for(unsigned i = 1; i < mipmap_count; ++i)
     {
         image_barrier(
-            cmd, img,
+            cmd, img, format,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             i-1, 1
@@ -278,12 +279,12 @@ void generate_mipmaps(
         );
         size = next_size;
         image_barrier(
-            cmd, img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, after, i-1, 1
+            cmd, img, format, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, after, i-1, 1
         );
     }
 
     image_barrier(
-        cmd, img,
+        cmd, img, format,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         after,
         mipmap_count-1, 1
@@ -413,6 +414,7 @@ std::vector<VkDescriptorPoolSize> calculate_descriptor_pool_sizes(
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
+    VkFormat format,
     VkImageLayout layout_before,
     VkImageLayout layout_after,
     uint32_t mip_level,
@@ -435,7 +437,7 @@ void image_barrier(
         VK_QUEUE_FAMILY_IGNORED,
         image,
         {
-            VK_IMAGE_ASPECT_COLOR_BIT,
+            deduce_image_aspect_flags(format),
             mip_level, mip_count,
             0, VK_REMAINING_ARRAY_LAYERS
         }
@@ -457,5 +459,21 @@ void interlace(void* dst, const void* src, const void* fill, size_t src_stride, 
     {
         memcpy((uint8_t*)dst+dst_stride*i, (uint8_t*)src+src_stride*i, src_stride);
         memcpy((uint8_t*)dst+dst_stride*i+src_stride, fill, dst_stride-src_stride);
+    }
+}
+
+VkImageAspectFlags deduce_image_aspect_flags(VkFormat format)
+{
+    switch(format)
+    {
+    case VK_FORMAT_D16_UNORM:
+    case VK_FORMAT_D32_SFLOAT:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT;
+    default:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
     }
 }

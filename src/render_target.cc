@@ -34,7 +34,7 @@ void render_target::transition_layout(VkCommandBuffer buf, size_t index, VkImage
     if(frames[index].layout == layout)
         return;
 
-    image_barrier(buf, frames[index].image, frames[index].layout, layout);
+    image_barrier(buf, frames[index].image, format, frames[index].layout, layout);
     frames[index].layout = layout;
 }
 

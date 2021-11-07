@@ -114,10 +114,10 @@ void scene::update(uint32_t image_index)
                     group.mat.transmittance
                 );
                 inst.material.textures = {
-                    get_st_index(group.mat.color_texture),
-                    get_st_index(group.mat.metallic_roughness_texture),
-                    get_st_index(group.mat.normal_texture),
-                    get_st_index(group.mat.emission_texture),
+                    get_st_index(group.mat.color_texture, image_index),
+                    get_st_index(group.mat.metallic_roughness_texture, image_index),
+                    get_st_index(group.mat.normal_texture, image_index),
+                    get_st_index(group.mat.emission_texture, image_index),
                 };
 
                 auto mesh_it = mesh_indices.find(group.mesh);
@@ -135,7 +135,7 @@ void scene::update(uint32_t image_index)
         });
     });
 
-    textures.resize(max_textures, filler_texture.get_image_view());
+    textures.resize(max_textures, filler_texture.get_image_view(image_index));
     samplers.resize(max_textures, filler_sampler.get());
     vertex_buffers.resize(max_entries, filler_buffer);
     index_buffers.resize(max_entries, filler_buffer);
@@ -241,7 +241,7 @@ void scene::draw_instance(VkCommandBuffer buf, size_t instance_id) const
     instance_meshes[instance_id]->draw(buf);
 }
 
-int32_t scene::get_st_index(material::sampler_tex st)
+int32_t scene::get_st_index(material::sampler_tex st, uint32_t image_index)
 {
     if(st.first == nullptr || st.second == nullptr)
         return -1;
@@ -250,7 +250,7 @@ int32_t scene::get_st_index(material::sampler_tex st)
     {
         int32_t index = st_pairs.size();
         st_pairs[st] = index;
-        textures.push_back(st.second->get_image_view());
+        textures.push_back(st.second->get_image_view(image_index));
         samplers.push_back(st.first->get());
         return index;
     }
