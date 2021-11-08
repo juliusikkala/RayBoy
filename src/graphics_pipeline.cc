@@ -98,7 +98,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
             VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             VK_ATTACHMENT_STORE_OP_DONT_CARE,
             VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
         };
         VkClearValue clear;
         if(targets[i]->is_depth_stencil())
@@ -265,6 +265,7 @@ void graphics_pipeline::init(
     {
         for(uint32_t j = 0; j < p.targets.size(); ++j)
         {
+            p.targets[j]->set_layout(p.attachments[j].finalLayout);
             image_views[j] = (*p.targets[j])[i].view;
         }
         VkFramebufferCreateInfo framebuffer_info = {

@@ -16,12 +16,16 @@ set(shader_src
     src/xor.comp
     src/forward.vert
     src/forward.frag
+    src/tonemap.comp
+    src/tonemap_msaa.comp
     # Add more shader sources here
 )
 set(shader_binary
     xor.comp.h
     forward.vert.h
     forward.frag.h
+    tonemap.comp.h
+    tonemap_msaa.comp.h
     # Add more shader binaries here
 )
 
@@ -79,6 +83,7 @@ add_executable(rayboy
     src/scene_update_render_stage.cc
     src/graphics_pipeline.cc
     src/forward_render_stage.cc
+    src/tonemap_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

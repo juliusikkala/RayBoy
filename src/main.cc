@@ -24,7 +24,7 @@ int main()
     entities([&](entity id, camera& cam){cam.set_aspect(aspect);});
 
     std::unique_ptr<render_pipeline> pipeline;
-    pipeline.reset(new plain_render_pipeline(ctx, entities));
+    pipeline.reset(new plain_render_pipeline(ctx, entities, {VK_SAMPLE_COUNT_1_BIT}));
 
     bool running = true;
     unsigned counter = 0;

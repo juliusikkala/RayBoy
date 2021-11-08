@@ -1,0 +1,22 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "tonemap.glsl"
+
+layout(binding = 0, rgba32f) uniform readonly image2D image_input;
+
+void main()
+{
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(image_output);
+
+    if(p.x < size.x && p.y < size.y)
+    {
+        vec4 col = imageLoad(image_input, p);
+        col.rgb = tonemap_pre_resolve(col.rgb);
+        col.rgb = tonemap_post_resolve(col.rgb);
+        imageStore(image_output, p, col);
+    }
+}
