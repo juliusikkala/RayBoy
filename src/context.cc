@@ -39,6 +39,16 @@ const device& context::get_device() const
     return *dev;
 }
 
+SDL_Window* context::get_window() const
+{
+    return win;
+}
+
+VkInstance context::get_instance() const
+{
+    return vulkan;
+}
+
 bool context::start_frame()
 {
     frame_counter++;
@@ -180,6 +190,12 @@ ivec2 context::get_size() const
 void context::at_frame_finish(std::function<void()>&& cleanup)
 {
     reap.at_finish(std::move(cleanup));
+}
+
+void context::sync_flush()
+{
+    dev->finish();
+    reap.flush();
 }
 
 VkQueryPool context::get_timestamp_query_pool(uint32_t image_index)

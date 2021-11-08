@@ -16,3 +16,6 @@
 [submodule "external/Vulkan-Loader"]
 	path = external/Vulkan-Loader
 	url = https://github.com/KhronosGroup/Vulkan-Loader.git
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui.git

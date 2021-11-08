@@ -1,7 +1,9 @@
 #include "context.hh"
 #include "gltf.hh"
 #include "ecs.hh"
+#include "gui.hh"
 #include "plain_render_pipeline.hh"
+#include "imgui.h"
 #include <iostream>
 #include <memory>
 
@@ -10,6 +12,7 @@ int main()
     ecs entities;
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx;
+    gui g(ctx);
 
     gltf_data main_scene = load_gltf(ctx, "data/white_room.glb", entities);
     gltf_data console = load_gltf(ctx, "data/gbcv2_contraband_asset.glb", entities);
@@ -27,7 +30,6 @@ int main()
     pipeline.reset(new plain_render_pipeline(ctx, entities, {VK_SAMPLE_COUNT_1_BIT}));
 
     bool running = true;
-    unsigned counter = 0;
     float pitch = 0, yaw = 0;
     int distance_steps = 0;
     float distance = 0;
@@ -39,6 +41,7 @@ int main()
         SDL_Event event;
         while(SDL_PollEvent(&event))
         {
+            g.handle_event(event);
             switch(event.type)
             {
             case SDL_QUIT:
@@ -46,6 +49,7 @@ int main()
                 break;
 
             case SDL_MOUSEMOTION:
+                if(ImGui::GetIO().WantCaptureMouse) break;
                 if(event.motion.state&SDL_BUTTON_LMASK)
                 {
                     pitch += event.motion.yrel * sensitivity;
@@ -87,6 +91,7 @@ int main()
                 break;
 
             case SDL_KEYDOWN:
+                if(ImGui::GetIO().WantCaptureKeyboard) break;
                 if(event.key.keysym.sym == SDLK_ESCAPE)
                 {
                     running = false;
@@ -98,13 +103,15 @@ int main()
                 break;
             }
         }
+
         gbc->set_orientation(yaw, vec3(0,0,-1));
         gbc->rotate(pitch, vec3(1,0,0));
         distance = 0.1 * pow(1.1, distance_steps);
         direction.y = -1;
         gbc->set_position(distance * direction);
 
-        //std::cout << counter++ << std::endl;
+        g.update();
+
         updater.update(entities);
         pipeline->render();
     }

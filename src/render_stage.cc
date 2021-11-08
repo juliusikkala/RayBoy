@@ -62,9 +62,9 @@ void render_stage::update_buffers(uint32_t)
 {
 }
 
-VkCommandBuffer render_stage::compute_commands()
+VkCommandBuffer render_stage::compute_commands(bool one_time_submit)
 {
-    return commands(ctx->get_device().compute_pool);
+    return commands(ctx->get_device().compute_pool, one_time_submit);
 }
 
 void render_stage::use_compute_commands(VkCommandBuffer buf, uint32_t image_index)
@@ -72,9 +72,9 @@ void render_stage::use_compute_commands(VkCommandBuffer buf, uint32_t image_inde
     use_commands(buf, ctx->get_device().compute_pool, image_index);
 }
 
-VkCommandBuffer render_stage::graphics_commands()
+VkCommandBuffer render_stage::graphics_commands(bool one_time_submit)
 {
-    return commands(ctx->get_device().graphics_pool);
+    return commands(ctx->get_device().graphics_pool, one_time_submit);
 }
 
 void render_stage::use_graphics_commands(VkCommandBuffer buf, uint32_t image_index)
@@ -82,7 +82,7 @@ void render_stage::use_graphics_commands(VkCommandBuffer buf, uint32_t image_ind
     use_commands(buf, ctx->get_device().graphics_pool, image_index);
 }
 
-VkCommandBuffer render_stage::commands(VkCommandPool pool)
+VkCommandBuffer render_stage::commands(VkCommandPool pool, bool one_time_submit)
 {
     VkCommandBufferAllocateInfo command_buffer_alloc_info = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -100,7 +100,7 @@ VkCommandBuffer render_stage::commands(VkCommandPool pool)
     VkCommandBufferBeginInfo begin_info = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         nullptr,
-        VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        one_time_submit ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
         nullptr
     };
     vkBeginCommandBuffer(buf, &begin_info);

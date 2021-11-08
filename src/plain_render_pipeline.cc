@@ -1,6 +1,5 @@
 #include "plain_render_pipeline.hh"
 
-
 plain_render_pipeline::plain_render_pipeline(
     context& ctx,
     ecs& entities,
@@ -51,6 +50,10 @@ void plain_render_pipeline::reset()
         color_target,
         screen_target
     ));
+
+    // Must remove the old one before calling new constructor.
+    gui_stage.reset();
+    gui_stage.reset(new gui_render_stage(*ctx));
 }
 
 VkSemaphore plain_render_pipeline::render_stages(VkSemaphore semaphore, uint32_t image_index)
@@ -58,5 +61,6 @@ VkSemaphore plain_render_pipeline::render_stages(VkSemaphore semaphore, uint32_t
     semaphore = scene_update_stage->run(image_index, semaphore);
     semaphore = forward_stage->run(image_index, semaphore);
     semaphore = tonemap_stage->run(image_index, semaphore);
+    semaphore = gui_stage->run(image_index, semaphore);
     return semaphore;
 }

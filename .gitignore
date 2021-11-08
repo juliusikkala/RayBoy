@@ -1,0 +1,8 @@
+.cache
+*.swp
+*.swo
+prese
+debug
+TODO
+imgui.ini
+compile_commands.json

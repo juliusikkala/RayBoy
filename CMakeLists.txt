@@ -48,10 +48,17 @@ elseif(APPLE)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_MACOS_MVK)
 endif()
 add_subdirectory(external/volk)
+
 add_executable(rayboy
     external/vk_mem_alloc.cc
     external/stb_image.cc
     external/tiny_gltf.cc
+    external/imgui/imgui.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    external/imgui/backends/imgui_impl_vulkan.cpp
+    external/imgui/backends/imgui_impl_sdl.cpp
     src/main.cc
     src/context.cc
     src/device.cc
@@ -84,6 +91,8 @@ add_executable(rayboy
     src/graphics_pipeline.cc
     src/forward_render_stage.cc
     src/tonemap_render_stage.cc
+    src/gui.cc
+    src/gui_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -92,11 +101,13 @@ target_include_directories(rayboy PUBLIC
     "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"
     "external/volk"
+    "external/imgui"
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_compile_features(rayboy PUBLIC cxx_std_17)
 target_link_libraries(rayboy PUBLIC SDL2)
 target_link_libraries(rayboy PUBLIC vulkan)
 target_link_libraries(rayboy PRIVATE volk)
+target_compile_definitions(rayboy PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 
 # https://stackoverflow.com/questions/57478571/why-wont-cmake-build-my-vulkan-spirv-shaders

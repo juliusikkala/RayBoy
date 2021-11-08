@@ -26,6 +26,8 @@ public:
     ~context();
 
     const device& get_device() const;
+    SDL_Window* get_window() const;
+    VkInstance get_instance() const;
 
     // Returns true when resources must be reset
     bool start_frame();
@@ -43,6 +45,7 @@ public:
     ivec2 get_size() const;
 
     void at_frame_finish(std::function<void()>&& cleanup);
+    void sync_flush();
 
     VkQueryPool get_timestamp_query_pool(uint32_t image_index);
     int32_t add_timer(const std::string& name);
