@@ -11,9 +11,11 @@ context::context(
     ivec2 size,
     bool fullscreen,
     bool vsync,
-    bool grab_mouse
-): size(size), vsync(vsync) {
-    init_sdl(fullscreen, grab_mouse);
+    bool grab_mouse,
+    int display
+): size(size), fullscreen(fullscreen), vsync(vsync)
+{
+    init_sdl(fullscreen, grab_mouse, display);
     init_vulkan();
     if(!SDL_Vulkan_CreateSurface(win, vulkan, &surface))
         throw std::runtime_error(SDL_GetError());
@@ -62,7 +64,7 @@ bool context::start_frame()
     if(frame_counter >= binary_start_semaphores.size())
     {
         wait_timeline_semaphore(
-            *this, frame_start_semaphore,
+            *this, frame_finish_semaphore,
             frame_counter - (binary_start_semaphores.size() - 1)
         );
         reap.finish_frame();
@@ -79,7 +81,9 @@ bool context::start_frame()
         return true;
     }
     image_index_history[image_history_index] = image_index;
-    cpu_frame_start_time[image_index] = std::chrono::steady_clock::now();
+    auto cpu_next_start_time = std::chrono::steady_clock::now();
+    cpu_frame_duration = cpu_next_start_time - cpu_frame_start_time;
+    cpu_frame_start_time = cpu_next_start_time;
 
     // Convert the binary semaphore into a timeline semaphore
     VkSemaphoreSubmitInfoKHR wait_info = {
@@ -144,16 +148,22 @@ void context::finish_frame(VkSemaphore wait)
         VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
         wait, frame_counter, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR, 0
     };
-    VkSemaphoreSubmitInfoKHR signal_info = {
-        VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
-        sem, 0, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR, 0
+    VkSemaphoreSubmitInfoKHR signal_infos[2] = {
+        {
+            VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
+            sem, 0, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR, 0
+        },
+        {
+            VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR, nullptr,
+            frame_finish_semaphore, frame_counter, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR, 0
+        }
     };
     VkSubmitInfo2KHR submit_info = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
         nullptr, 0,
         1, &wait_info,
         0, nullptr,
-        1, &signal_info
+        2, signal_infos
     };
     vkQueueSubmit2KHR(dev->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
 
@@ -180,6 +190,11 @@ void context::reset_swapchain()
     deinit_swapchain();
     reap.flush();
     init_swapchain();
+}
+
+void context::set_size(ivec2 size)
+{
+    SDL_SetWindowSize(win, size.x, size.y);
 }
 
 ivec2 context::get_size() const
@@ -233,18 +248,80 @@ void context::dump_timing() const
     }
 }
 
-void context::init_sdl(bool fullscreen, bool grab_mouse)
+int context::get_available_displays() const
+{
+    return SDL_GetNumVideoDisplays();
+}
+
+void context::set_current_display(int display)
+{
+    int cur_display = get_current_display();
+    if(cur_display == display || display == -1 || cur_display == -1)
+        return;
+
+    // Yes, I know this is really crappy... But it's the only way I got it to
+    // work right... You are welcome to improve it. The delays were needed to
+    // avoid tripping X11.
+    if(fullscreen) SDL_SetWindowFullscreen(win, 0);
+    SDL_Delay(100);
+    SDL_SetWindowPosition(
+        win,
+        SDL_WINDOWPOS_CENTERED_DISPLAY(display),
+        SDL_WINDOWPOS_CENTERED_DISPLAY(display)
+    );
+    SDL_Delay(100);
+    if(fullscreen)
+    {
+        SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_GetWindowSize(win, &size.x, &size.y);
+    }
+}
+
+int context::get_current_display() const
+{
+    uint32_t flags = SDL_GetWindowFlags(win);
+    if(!(flags & SDL_WINDOW_FULLSCREEN_DESKTOP)) return -1;
+    return SDL_GetWindowDisplayIndex(win);
+}
+
+void context::set_fullscreen(bool fullscreen)
+{
+    if(this->fullscreen == fullscreen) return;
+
+    SDL_SetWindowFullscreen(win, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+
+    SDL_GetWindowSize(win, &size.x, &size.y);
+
+    this->fullscreen = fullscreen;
+}
+
+bool context::is_fullscreen() const
+{
+    return fullscreen;
+}
+
+void context::set_vsync(bool vsync)
+{
+    this->vsync = vsync;
+}
+
+bool context::get_vsync() const
+{
+    return vsync;
+}
+
+void context::init_sdl(bool fullscreen, bool grab_mouse, int display)
 {
     if(SDL_Init(SDL_INIT_EVERYTHING))
         throw std::runtime_error(SDL_GetError());
 
     win = SDL_CreateWindow(
         "RayBoy",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
+        display >= 0 ? SDL_WINDOWPOS_CENTERED_DISPLAY(display) : SDL_WINDOWPOS_UNDEFINED,
+        display >= 0 ? SDL_WINDOWPOS_CENTERED_DISPLAY(display) : SDL_WINDOWPOS_UNDEFINED,
         size.x,
         size.y,
-        SDL_WINDOW_VULKAN | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
+        SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
     );
     if(!win)
         throw std::runtime_error(SDL_GetError());
@@ -388,6 +465,7 @@ void context::init_swapchain()
         {
             present_mode = mode;
             found_mode = true;
+            break;
         }
     }
 
@@ -399,12 +477,8 @@ void context::init_swapchain()
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev->physical_device, surface, &surface_caps);
 
     // Extent check
-    if(
-        size.x < surface_caps.minImageExtent.width || size.x > surface_caps.maxImageExtent.width ||
-        size.y < surface_caps.minImageExtent.height || size.y > surface_caps.maxImageExtent.height
-    ){
-        throw std::runtime_error("Cannot match desired resolution in swapchain");
-    }
+    size.x = clamp((uint32_t)size.x, surface_caps.minImageExtent.width, surface_caps.maxImageExtent.width);
+    size.y = clamp((uint32_t)size.y, surface_caps.minImageExtent.height, surface_caps.maxImageExtent.height);
 
     // Go for three images just so that we have to do things the hard way
     uint32_t image_count = std::max(3u, surface_caps.minImageCount);
@@ -423,7 +497,7 @@ void context::init_swapchain()
         {(uint32_t)size.x, (uint32_t)size.y},
         1,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|
-        VK_IMAGE_USAGE_STORAGE_BIT,
+        VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         VK_SHARING_MODE_EXCLUSIVE,
         1, (const uint32_t*)&dev->graphics_family_index,
         surface_caps.currentTransform,
@@ -449,6 +523,7 @@ void context::init_swapchain()
         binary_finish_semaphores.push_back(create_binary_semaphore(*this));
     }
     frame_start_semaphore = create_timeline_semaphore(*this);
+    frame_finish_semaphore = create_timeline_semaphore(*this);
     frame_counter = 0;
     image_index_history.resize(image_count, -1);
 }
@@ -458,6 +533,7 @@ void context::deinit_swapchain()
     dev->finish();
     image_index_history.clear();
     frame_start_semaphore.reset();
+    frame_finish_semaphore.reset();
     binary_start_semaphores.clear();
     binary_finish_semaphores.clear();
     swapchain_image_views.clear();
@@ -468,7 +544,6 @@ void context::init_timing()
 {
     uint32_t image_count = get_image_count();
     timestamp_query_pools.resize(image_count);
-    cpu_frame_start_time.resize(image_count);
     for(uint32_t i = 0; i < image_count; ++i)
     {
         VkQueryPoolCreateInfo info = {
@@ -485,7 +560,6 @@ void context::init_timing()
             nullptr,
             &timestamp_query_pools[i]
         );
-        cpu_frame_start_time[i] = std::chrono::steady_clock::now();
     }
     free_queries.resize(MAX_TIMER_COUNT);
     std::iota(free_queries.begin(), free_queries.end(), 0u);
@@ -498,7 +572,6 @@ void context::deinit_timing()
     timestamp_query_pools.clear();
     free_queries.clear();
     timers.clear();
-    cpu_frame_start_time.clear();
 }
 
 void context::update_timing_results(uint32_t image_index)
@@ -544,9 +617,7 @@ void context::update_timing_results(uint32_t image_index)
     });
     tmp.push_back({
         0,
-        (uint64_t)std::chrono::nanoseconds(
-            std::chrono::steady_clock::now() - cpu_frame_start_time[image_index]
-        ).count(),
+        (uint64_t)std::chrono::nanoseconds(cpu_frame_duration).count(),
         "CPU total"
     });
 

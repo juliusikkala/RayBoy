@@ -34,6 +34,7 @@ private:
     VkDescriptorSetLayoutBinding find_binding(size_t binding_index) const;
     void ensure_semaphores(size_t count);
 
+    bool first_frame;
     std::vector<std::vector<vkres<VkCommandBuffer>>> command_buffers;
     std::vector<vkres<VkSemaphore>> finished;
 };

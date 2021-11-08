@@ -2,7 +2,7 @@
 #include "backends/imgui_impl_vulkan.h"
 #include "helpers.hh"
 
-gui_render_stage::gui_render_stage(context& ctx)
+gui_render_stage::gui_render_stage(context& ctx, render_target& target)
 : render_stage(ctx), stage_timer(ctx, "gui_render_stage")
 {
     const device& dev = ctx.get_device();
@@ -42,8 +42,6 @@ gui_render_stage::gui_render_stage(context& ctx)
     );
     descriptor_pool = vkres(ctx, tmp_pool);
 
-    render_target target = ctx.get_render_target();
-
     // Mostly copied from imgui_impl_vulkan.cpp
     {
         VkAttachmentDescription attachment = {};
@@ -53,7 +51,7 @@ gui_render_stage::gui_render_stage(context& ctx)
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment.initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+        attachment.initialLayout = target.get_layout();
         attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         VkAttachmentReference color_attachment = {};
         color_attachment.attachment = 0;
@@ -80,6 +78,8 @@ gui_render_stage::gui_render_stage(context& ctx)
         VkRenderPass tmp_render_pass;
         vkCreateRenderPass(dev.logical_device, &info, nullptr, &tmp_render_pass);
         render_pass = vkres(ctx, tmp_render_pass);
+
+        target.set_layout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     }
 
     {

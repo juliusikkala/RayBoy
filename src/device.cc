@@ -195,6 +195,11 @@ device::device(
     if(found_rt_device)
         allocator_info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocator_info, &allocator);
+
+    // Save extra details
+    available_sample_counts =
+        physical_device_props.properties.limits.framebufferColorSampleCounts &
+        physical_device_props.properties.limits.framebufferDepthSampleCounts;
 }
 
 device::~device()

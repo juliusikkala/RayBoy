@@ -3,7 +3,7 @@
 #include <cassert>
 
 render_stage::render_stage(context& ctx)
-: ctx(&ctx)
+: ctx(&ctx), first_frame(true)
 {
     command_buffers.resize(ctx.get_image_count());
 }
@@ -47,11 +47,13 @@ VkSemaphore render_stage::run(uint32_t image_index, VkSemaphore wait)
         VkSubmitInfo2KHR submit_info = {
             VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
             nullptr, 0,
-            frame_counter != 0 && i == 0 ? 2u : 1u, wait_infos,
+            first_frame || i != 0 ? 1u : 2u, wait_infos,
             1, &command_info,
             1, &signal_info
         };
+        first_frame = false;
         vkQueueSubmit2KHR(compute ? ctx->get_device().compute_queue : ctx->get_device().graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+
         prev = *cur;
     }
 

@@ -78,7 +78,6 @@ tonemap_render_stage::tonemap_render_stage(
         ivec2 size = ctx.get_size();
         vkCmdDispatch(buf, (size.x+7)/8, (size.y+7)/8, 1);
 
-        dst.transition_layout(buf, i, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR);
         stage_timer.stop(buf, i);
         use_compute_commands(buf, i);
     }

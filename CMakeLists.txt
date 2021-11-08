@@ -93,6 +93,9 @@ add_executable(rayboy
     src/tonemap_render_stage.cc
     src/gui.cc
     src/gui_render_stage.cc
+    src/io.cc
+    src/options.cc
+    src/blit_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -100,6 +103,7 @@ target_include_directories(rayboy PUBLIC
     "external/glm"
     "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"
+    "external/nativefiledialog/src/include"
     "external/volk"
     "external/imgui"
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -108,6 +112,33 @@ target_compile_features(rayboy PUBLIC cxx_std_17)
 target_link_libraries(rayboy PUBLIC SDL2)
 target_link_libraries(rayboy PUBLIC vulkan)
 target_link_libraries(rayboy PRIVATE volk)
-target_compile_definitions(rayboy PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 
-# https://stackoverflow.com/questions/57478571/why-wont-cmake-build-my-vulkan-spirv-shaders
+if (WIN32)
+    set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/nfd.lib)
+    add_custom_target(nativefiledialog
+        COMMAND make nfd
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/gmake_windows
+    )
+    target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
+elseif(UNIX AND NOT APPLE)
+    set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/libnfd.a)
+    add_custom_target(nativefiledialog
+        COMMAND make nfd
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/gmake_linux
+    )
+    target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK REQUIRED gtk+-3.0)
+elseif(APPLE)
+    set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/libnfd.a)
+    add_custom_target(nativefiledialog
+        COMMAND make nfd
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/gmake_macosx
+    )
+    target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
+endif()
+
+target_link_libraries(rayboy PUBLIC ${GTK_LIBRARIES})
+add_dependencies(rayboy nativefiledialog)
+
+target_compile_definitions(rayboy PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)

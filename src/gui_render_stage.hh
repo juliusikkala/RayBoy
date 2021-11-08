@@ -9,7 +9,7 @@ class render_target;
 class gui_render_stage: public render_stage
 {
 public:
-    gui_render_stage(context& ctx);
+    gui_render_stage(context& ctx, render_target& target);
     ~gui_render_stage();
 
 protected:

@@ -1,5 +1,6 @@
 #include "reaper.hh"
 #include <utility>
+#include <cstdio>
 
 void reaper::start_frame()
 {
@@ -28,8 +29,6 @@ void reaper::flush()
 
     queue.clear();
     counts.clear();
-    frame_counter = 0;
-    finish_counter = 0;
 }
 
 void reaper::at_finish(std::function<void()>&& cleanup)

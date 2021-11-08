@@ -36,6 +36,8 @@ struct device
     VkCommandPool graphics_pool;
     VkCommandPool compute_pool;
     VmaAllocator allocator;
+
+    VkSampleCountFlags available_sample_counts;
 };
 
 #endif

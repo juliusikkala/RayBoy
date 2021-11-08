@@ -21,7 +21,8 @@ public:
         ivec2 size = ivec2(1280, 720),
         bool fullscreen = false,
         bool vsync = true,
-        bool grab_mouse = false
+        bool grab_mouse = false,
+        int display = -1
     );
     ~context();
 
@@ -42,6 +43,7 @@ public:
     uint64_t get_frame_counter() const;
 
     void reset_swapchain();
+    void set_size(ivec2 size);
     ivec2 get_size() const;
 
     void at_frame_finish(std::function<void()>&& cleanup);
@@ -52,8 +54,19 @@ public:
     void remove_timer(uint32_t image_index);
     void dump_timing() const;
 
+    int get_available_displays() const;
+
+    void set_current_display(int display = -1);
+    int get_current_display() const;
+
+    void set_fullscreen(bool fullscreen);
+    bool is_fullscreen() const;
+
+    void set_vsync(bool vsync);
+    bool get_vsync() const;
+
 private:
-    void init_sdl(bool fullscreen, bool grab_mouse);
+    void init_sdl(bool fullscreen, bool grab_mouse, int display);
     void deinit_sdl();
 
     void init_vulkan();
@@ -68,6 +81,7 @@ private:
 
     // SDL-related members
     ivec2 size;
+    bool fullscreen;
     bool vsync;
     SDL_Window* win;
 
@@ -88,6 +102,7 @@ private:
     std::vector<vkres<VkSemaphore>> binary_start_semaphores;
     std::vector<vkres<VkSemaphore>> binary_finish_semaphores;
     vkres<VkSemaphore> frame_start_semaphore;
+    vkres<VkSemaphore> frame_finish_semaphore;
     uint64_t frame_counter;
     uint32_t image_index;
     std::vector<int32_t> image_index_history;
@@ -96,7 +111,8 @@ private:
     std::vector<VkQueryPool> timestamp_query_pools;
     std::vector<int32_t> free_queries;
     std::unordered_map<int32_t, std::string> timers;
-    std::vector<std::chrono::steady_clock::time_point> cpu_frame_start_time;
+    std::chrono::steady_clock::duration cpu_frame_duration;
+    std::chrono::steady_clock::time_point cpu_frame_start_time;
     std::vector<std::pair<std::string, double>> timing_results;
 
     // Memory handling
