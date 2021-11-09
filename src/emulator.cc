@@ -15,7 +15,7 @@ void log_callback(GB_gameboy_t*, const char*, GB_log_attributes) {}
 }
 
 emulator::emulator()
-: powered(false)
+: powered(false), destroy(false), worker(&emulator::worker_func, this)
 {
     active_framebuffer.resize(160*144, 0xFFFFFFFF);
     finished_framebuffer.resize(160*144, 0xFFFFFFFF);
@@ -24,11 +24,17 @@ emulator::emulator()
 
 emulator::~emulator()
 {
+    {
+        std::unique_lock lock(mutex);
+        destroy = true;
+    }
+    worker.join();
     set_power(false);
 }
 
 void emulator::reset()
 {
+    std::unique_lock lock(mutex);
     if(powered)
     {
         GB_reset(&gb);
@@ -36,13 +42,12 @@ void emulator::reset()
     memset(active_framebuffer.data(), 0xFF, sizeof(uint32_t)*active_framebuffer.size());
     memset(finished_framebuffer.data(), 0xFF, sizeof(uint32_t)*finished_framebuffer.size());
     // Faded framebuffer is intentionally not cleared here!
-    surplus_time = 0;
-    surplus_ticks = 0;
     age_ticks = 0;
 }
 
 bool emulator::load_rom(const std::string& path)
 {
+    std::unique_lock lock(mutex);
     reset();
     if(GB_load_rom(&gb, path.c_str()) == 0)
     {
@@ -54,6 +59,7 @@ bool emulator::load_rom(const std::string& path)
 
 void emulator::load_sav(const std::string& path)
 {
+    std::unique_lock lock(mutex);
     reset();
     GB_load_battery(&gb, path.c_str());
     sav = path;
@@ -61,6 +67,7 @@ void emulator::load_sav(const std::string& path)
 
 void emulator::set_power(bool on)
 {
+    std::unique_lock lock(mutex);
     if(powered == on)
         return;
     powered = on;
@@ -73,50 +80,9 @@ void emulator::set_power(bool on)
     else deinit_gb();
 }
 
-void emulator::run(uint64_t us)
-{
-    uint64_t time = surplus_time + us*TICKS_PER_SECOND;
-    uint64_t ticks_to_simulate = time/1000000;
-    surplus_time = time%1000000;
-
-    age_ticks = 0;
-
-    if(surplus_ticks >= ticks_to_simulate)
-    {
-        surplus_ticks -= ticks_to_simulate;
-    }
-    else
-    {
-        ticks_to_simulate -= surplus_ticks;
-        surplus_ticks = 0;
-
-        if(this->powered && rom.size())
-        {
-            while(ticks_to_simulate > 0)
-            {
-                uint8_t ticks = GB_run(&gb);
-                age_ticks += ticks;
-                if(ticks < ticks_to_simulate)
-                {
-                    ticks_to_simulate -= ticks;
-                }
-                if(ticks >= ticks_to_simulate)
-                {
-                    surplus_ticks = ticks - ticks_to_simulate;
-                    ticks_to_simulate = 0;
-                }
-            }
-        }
-        else
-        {
-            age_ticks += ticks_to_simulate;
-        }
-    }
-    age_framebuffer();
-}
-
 void emulator::set_button(GB_key_t button, bool pressed)
 {
+    std::unique_lock lock(mutex);
     if(powered) GB_set_key_state(&gb, button, pressed);
 }
 
@@ -135,10 +101,86 @@ uvec2 emulator::get_screen_size()
     return uvec2(160, 144);
 }
 
+void emulator::lock_framebuffer()
+{
+    mutex.lock();
+}
+
 uint32_t* emulator::get_framebuffer_data(bool faded)
 {
-    if(faded) return faded_framebuffer.data();
+    if(faded)
+    {
+        age_framebuffer();
+        return faded_framebuffer.data();
+    }
     else return finished_framebuffer.data();
+}
+
+void emulator::unlock_framebuffer()
+{
+    mutex.unlock();
+}
+
+void emulator::worker_func()
+{
+    auto start = std::chrono::high_resolution_clock::now();
+    auto delta = start-start;
+    uint64_t surplus_time = 0;
+    uint64_t surplus_ticks = 0;
+    uint64_t delta_us = 0;
+    while(true)
+    {
+        {
+            std::unique_lock lock(mutex);
+            if(destroy)
+                break;
+
+            auto end = std::chrono::high_resolution_clock::now();
+            delta = end - start;
+            delta_us = std::chrono::round<std::chrono::microseconds>(delta).count();
+            start = end;
+
+            uint64_t time = surplus_time + delta_us*TICKS_PER_SECOND;
+            uint64_t ticks_to_simulate = time/1000000;
+            surplus_time = time%1000000;
+
+            if(surplus_ticks >= ticks_to_simulate)
+            {
+                surplus_ticks -= ticks_to_simulate;
+            }
+            else
+            {
+                ticks_to_simulate -= surplus_ticks;
+                surplus_ticks = 0;
+
+                if(this->powered && rom.size())
+                {
+                    while(ticks_to_simulate > 0)
+                    {
+                        uint8_t ticks = GB_run(&gb);
+                        age_ticks += ticks;
+                        if(ticks < ticks_to_simulate)
+                        {
+                            ticks_to_simulate -= ticks;
+                        }
+                        if(ticks >= ticks_to_simulate)
+                        {
+                            surplus_ticks = ticks - ticks_to_simulate;
+                            ticks_to_simulate = 0;
+                        }
+                    }
+                }
+                else
+                {
+                    age_ticks += ticks_to_simulate;
+                }
+            }
+        }
+        auto local_end = std::chrono::high_resolution_clock::now();
+        auto local_delta = local_end - start;
+        if(local_delta < delta)
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
 }
 
 void emulator::init_gb()
@@ -164,8 +206,6 @@ void emulator::init_gb()
     GB_set_rtc_mode(&gb, GB_RTC_MODE_SYNC_TO_HOST);
     GB_apu_set_sample_callback(&gb, push_audio_sample);
 
-    surplus_time = 0;
-    surplus_ticks = 0;
     powered = true;
 }
 

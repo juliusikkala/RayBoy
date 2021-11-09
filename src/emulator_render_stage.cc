@@ -70,5 +70,7 @@ emulator_render_stage::emulator_render_stage(
 
 void emulator_render_stage::update_buffers(uint32_t image_index)
 {
+    emu->lock_framebuffer();
     image_buffer.update(image_index, emu->get_framebuffer_data(faded));
+    emu->unlock_framebuffer();
 }

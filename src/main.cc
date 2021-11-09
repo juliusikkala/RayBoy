@@ -74,18 +74,12 @@ int main()
     int distance_steps = 0;
     float distance = 0;
     float sensitivity = 0.3f;
-    auto start_frame = std::chrono::steady_clock::now();
     bool need_swapchain_reset = false;
     bool need_pipeline_reset = false;
     vec3 direction = vec3(0);
     gbc->set_position(vec3(0, -0.1, 0));
     while(running)
     {
-        auto next_frame = std::chrono::steady_clock::now();
-        auto delta = next_frame - start_frame;
-        uint64_t delta_us = std::chrono::round<std::chrono::microseconds>(delta).count();
-        start_frame = next_frame;
-
         SDL_Event event;
         while(SDL_PollEvent(&event))
         {
@@ -234,8 +228,6 @@ int main()
             need_pipeline_reset = false;
             pipeline->reset();
         }
-
-        emu.run(delta_us);
 
         uvec2 size = ctx.get_size();
         float aspect = size.x/float(size.y);

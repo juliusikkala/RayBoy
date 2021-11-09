@@ -25,3 +25,6 @@
 [submodule "external/SameBoy"]
 	path = external/SameBoy
 	url = https://github.com/LIJI32/SameBoy.git
+[submodule "external/openal-soft"]
+	path = external/openal-soft
+	url = https://github.com/kcat/openal-soft.git
