@@ -4,7 +4,7 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 endif()
 
-project(RayBoy LANGUAGES CXX)
+project(RayBoy LANGUAGES C CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -18,6 +18,7 @@ set(shader_src
     src/forward.frag
     src/tonemap.comp
     src/tonemap_msaa.comp
+    src/emulator_transform.comp
     # Add more shader sources here
 )
 set(shader_binary
@@ -26,6 +27,7 @@ set(shader_binary
     forward.frag.h
     tonemap.comp.h
     tonemap_msaa.comp.h
+    emulator_transform.comp.h
     # Add more shader binaries here
 )
 
@@ -49,6 +51,15 @@ elseif(APPLE)
 endif()
 add_subdirectory(external/volk)
 
+file(GLOB SAMEBOY_CORE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/external/SameBoy/Core/*.c)
+add_library(SameBoy STATIC ${SAMEBOY_CORE_SRC})
+target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_VERSION="0.14.7")
+target_compile_options(SameBoy PRIVATE
+    -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
+    -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
+    -Wno-implicit-function-declaration -O3
+) 
+
 add_executable(rayboy
     external/vk_mem_alloc.cc
     external/stb_image.cc
@@ -71,6 +82,7 @@ add_executable(rayboy
     src/render_pipeline.cc
     src/gpu_pipeline.cc
     src/compute_pipeline.cc
+    src/fancy_render_pipeline.cc
     src/plain_render_pipeline.cc
     src/timer.cc
     src/math.cc
@@ -96,6 +108,8 @@ add_executable(rayboy
     src/io.cc
     src/options.cc
     src/blit_render_stage.cc
+    src/emulator.cc
+    src/emulator_render_stage.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -104,6 +118,7 @@ target_include_directories(rayboy PUBLIC
     "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"
     "external/nativefiledialog/src/include"
+    "external/SameBoy/Core"
     "external/volk"
     "external/imgui"
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -112,6 +127,7 @@ target_compile_features(rayboy PUBLIC cxx_std_17)
 target_link_libraries(rayboy PUBLIC SDL2)
 target_link_libraries(rayboy PUBLIC vulkan)
 target_link_libraries(rayboy PRIVATE volk)
+target_link_libraries(rayboy PRIVATE SameBoy)
 
 if (WIN32)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/nfd.lib)

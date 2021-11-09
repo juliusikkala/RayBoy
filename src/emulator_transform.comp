@@ -1,0 +1,30 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(binding = 0, rgba32f) uniform writeonly image2D image_output;
+
+layout(binding = 1) buffer uniform_buffer {
+    uint pixels[];
+} input_data;
+
+layout(push_constant) uniform push_constants
+{
+    ivec2 input_size;
+    uint use_color_mapping;
+} pc;
+
+void main()
+{
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 output_size = imageSize(image_output);
+
+    if(p.x < output_size.x && p.y < output_size.y)
+    {
+        ivec2 i = p*pc.input_size/output_size;
+    
+        uint pixel = input_data.pixels[i.y * pc.input_size.x + i.x];
+        imageStore(image_output, p, unpackUnorm4x8(pixel));
+    }
+}

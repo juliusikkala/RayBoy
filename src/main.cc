@@ -3,9 +3,41 @@
 #include "ecs.hh"
 #include "gui.hh"
 #include "plain_render_pipeline.hh"
+#include "fancy_render_pipeline.hh"
+#include "emulator.hh"
 #include "imgui.h"
 #include <iostream>
 #include <memory>
+#include <unordered_map>
+
+void handle_emulator_input(emulator& emu, const SDL_Event& event)
+{
+    std::unordered_map<SDL_Keycode, GB_key_t> bindings = {
+        {SDLK_z, GB_KEY_A},
+        {SDLK_x, GB_KEY_B},
+        {SDLK_COMMA, GB_KEY_B},
+        {SDLK_PERIOD, GB_KEY_A},
+        {SDLK_RETURN, GB_KEY_START},
+        {SDLK_BACKSPACE, GB_KEY_SELECT},
+        {SDLK_UP, GB_KEY_UP},
+        {SDLK_DOWN, GB_KEY_DOWN},
+        {SDLK_LEFT, GB_KEY_LEFT},
+        {SDLK_RIGHT, GB_KEY_RIGHT},
+        {SDLK_w, GB_KEY_UP},
+        {SDLK_s, GB_KEY_DOWN},
+        {SDLK_a, GB_KEY_LEFT},
+        {SDLK_d, GB_KEY_RIGHT},
+        {SDLK_k, GB_KEY_UP},
+        {SDLK_j, GB_KEY_DOWN},
+        {SDLK_h, GB_KEY_LEFT},
+        {SDLK_l, GB_KEY_RIGHT}
+    };
+    auto it = bindings.find(event.key.keysym.sym);
+    if(it != bindings.end())
+    {
+        emu.set_button(it->second, event.type == SDL_KEYDOWN);
+    }
+}
 
 int main()
 {
@@ -16,6 +48,8 @@ int main()
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx(opts.window_size, opts.fullscreen, opts.vsync);
     gui g(ctx, opts);
+    emulator emu;
+    emu.set_power(true);
 
     gltf_data main_scene = load_gltf(ctx, "data/white_room.glb", entities);
     gltf_data console = load_gltf(ctx, "data/gbcv2_contraband_asset.glb", entities);
@@ -26,10 +60,12 @@ int main()
     gbc->set_parent(cam_transform);
 
     std::unique_ptr<render_pipeline> pipeline;
-    plain_render_pipeline::options plain_options = {
+    plain_render_pipeline::options plain_options = {};
+    fancy_render_pipeline::options fancy_options = {
         opts.resolution_scaling, (VkSampleCountFlagBits)opts.msaa_samples
     };
-    pipeline.reset(new plain_render_pipeline(ctx, entities, plain_options));
+    pipeline.reset(new plain_render_pipeline(ctx, emu, plain_options));
+    //pipeline.reset(new fancy_render_pipeline(ctx, entities, fancy_options));
 
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
@@ -38,12 +74,18 @@ int main()
     int distance_steps = 0;
     float distance = 0;
     float sensitivity = 0.3f;
+    auto start_frame = std::chrono::steady_clock::now();
     bool need_swapchain_reset = false;
     bool need_pipeline_reset = false;
     vec3 direction = vec3(0);
     gbc->set_position(vec3(0, -0.1, 0));
     while(running)
     {
+        auto next_frame = std::chrono::steady_clock::now();
+        auto delta = next_frame - start_frame;
+        uint64_t delta_us = std::chrono::round<std::chrono::microseconds>(delta).count();
+        start_frame = next_frame;
+
         SDL_Event event;
         while(SDL_PollEvent(&event))
         {
@@ -97,22 +139,36 @@ int main()
                 break;
 
             case SDL_KEYDOWN:
+            case SDL_KEYUP:
                 if(ImGui::GetIO().WantCaptureKeyboard) break;
                 if(event.key.keysym.sym == SDLK_ESCAPE)
                 {
                     running = false;
                 }
-                if(event.key.keysym.sym == SDLK_t)
+                if(event.key.keysym.sym == SDLK_t && event.type == SDL_KEYDOWN)
                 {
                     ctx.dump_timing();
                 }
+                handle_emulator_input(emu, event);
                 break;
 
             case SDL_DROPFILE:
-                // TODO
-                std::cout << "Should load file " << event.drop.file << std::endl;
-                opts.push_recent_rom(event.drop.file);
+                {
+                fs::path path(event.drop.file);
+                if(path.extension() == ".sav")
+                {
+                    emu.load_sav(event.drop.file);
+                }
+                else if(path.extension() == ".gbc" || path.extension() == ".gb")
+                {
+                    if(emu.load_rom(event.drop.file))
+                    {
+                        opts.push_recent_rom(event.drop.file);
+                        emu.print_info();
+                    }
+                }
                 SDL_free(event.drop.file);
+                }
                 break;
 
             case SDL_WINDOWEVENT:
@@ -130,10 +186,12 @@ int main()
                 switch(event.user.code)
                 {
                 case gui::SET_RESOLUTION_SCALING:
-                    plain_options.resolution_scaling = opts.resolution_scaling;
-                    if(auto* ptr = dynamic_cast<plain_render_pipeline*>(pipeline.get()))
-                        ptr->set_options(plain_options);
-                    need_pipeline_reset = true;
+                    fancy_options.resolution_scaling = opts.resolution_scaling;
+                    if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
+                    {
+                        ptr->set_options(fancy_options);
+                        need_pipeline_reset = true;
+                    }
                     break;
                 case gui::SET_DISPLAY:
                     ctx.set_current_display(opts.display_index);
@@ -150,10 +208,12 @@ int main()
                     need_swapchain_reset = true;
                     break;
                 case gui::SET_ANTIALIASING:
-                    plain_options.samples = (VkSampleCountFlagBits)opts.msaa_samples;
-                    if(auto* ptr = dynamic_cast<plain_render_pipeline*>(pipeline.get()))
-                        ptr->set_options(plain_options);
-                    need_pipeline_reset = true;
+                    fancy_options.samples = (VkSampleCountFlagBits)opts.msaa_samples;
+                    if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
+                    {
+                        ptr->set_options(fancy_options);
+                        need_pipeline_reset = true;
+                    }
                     break;
                 }
                 break;
@@ -174,6 +234,8 @@ int main()
             need_pipeline_reset = false;
             pipeline->reset();
         }
+
+        emu.run(delta_us);
 
         uvec2 size = ctx.get_size();
         float aspect = size.x/float(size.y);

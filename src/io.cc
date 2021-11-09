@@ -72,7 +72,7 @@ fs::path get_writable_path()
     return path;
 }
 
-std::set<fs::path> get_readonly_paths()
+std::vector<fs::path> get_readonly_paths()
 {
     static bool has_path = false;
     static fs::path path;
@@ -85,15 +85,25 @@ std::set<fs::path> get_readonly_paths()
         has_path = true;
     }
 
-    std::set<fs::path> paths;
-    paths.insert(path);
+    std::vector<fs::path> paths;
+    paths.push_back(path);
 
-    paths.insert(".");
+    paths.push_back(".");
 #ifdef DATA_DIRECTORY
-    paths.insert(fs::path{DATA_DIRECTORY});
+    paths.push_back(fs::path{DATA_DIRECTORY});
 #endif
 
     return paths;
+}
+
+std::string get_readonly_path(const std::string& file)
+{
+    for(const fs::path& path: get_readonly_paths())
+    {
+        if(fs::exists(path/file))
+            return (path/file).string();
+    }
+    return file;
 }
 
 void write_json_file(const fs::path& path, const json& j)

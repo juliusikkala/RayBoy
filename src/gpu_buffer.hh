@@ -3,6 +3,7 @@
 
 #include "context.hh"
 #include <vector>
+#include <type_traits>
 
 // This class is specifically for easy-to-update GPU buffers; it abstracts 
 // staging buffers and in-flight frames. If your buffer doesn't update
@@ -22,7 +23,7 @@ public:
 
     VkBuffer operator[](uint32_t image_index) const;
 
-    void update(uint32_t image_index, const void* data, size_t bytes = 0);
+    void update_ptr(uint32_t image_index, const void* data, size_t bytes = 0);
     template<typename T, typename F>
     void update(uint32_t image_index, F&& f);
     template<typename T>
@@ -54,7 +55,14 @@ void gpu_buffer::update(uint32_t image_index, F&& f)
 template<typename T>
 void gpu_buffer::update(uint32_t image_index, const T& t)
 {
-    update(image_index, &t, sizeof(T));
+    if constexpr(std::is_pointer_v<T>)
+    {
+        update_ptr(image_index, t, bytes);
+    }
+    else
+    {
+        update_ptr(image_index, &t, sizeof(T));
+    }
 }
 
 #endif

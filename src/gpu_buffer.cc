@@ -32,7 +32,7 @@ VkBuffer gpu_buffer::operator[](uint32_t image_index) const
     return image_index < buffers.size() ? *buffers[image_index] : *buffers.front();
 }
 
-void gpu_buffer::update(uint32_t image_index, const void* data, size_t bytes)
+void gpu_buffer::update_ptr(uint32_t image_index, const void* data, size_t bytes)
 {
     if(staging_buffers.size() == 0) return;
 

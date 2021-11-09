@@ -8,7 +8,8 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 fs::path get_writable_path();
-std::set<fs::path> get_readonly_paths();
+std::vector<fs::path> get_readonly_paths();
+std::string get_readonly_path(const std::string& file);
 
 void write_json_file(const fs::path& path, const json& j);
 json read_json_file(const fs::path& path);

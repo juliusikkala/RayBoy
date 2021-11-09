@@ -22,3 +22,6 @@
 [submodule "external/nativefiledialog"]
 	path = external/nativefiledialog
 	url = https://github.com/mlabbe/nativefiledialog.git
+[submodule "external/SameBoy"]
+	path = external/SameBoy
+	url = https://github.com/LIJI32/SameBoy.git
