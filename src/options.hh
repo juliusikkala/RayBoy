@@ -12,6 +12,7 @@ struct options
     bool fullscreen = false;
     bool vsync = true;
     int display_index = -1;
+    std::string mode = "plain";
 
     json serialize() const;
     bool deserialize(const json& j);

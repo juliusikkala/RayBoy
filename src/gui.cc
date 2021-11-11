@@ -204,6 +204,29 @@ void gui::update()
                 ImGui::EndMenu();
             }
 
+            if(ImGui::BeginMenu("Mode"))
+            {
+                static constexpr struct {
+                    const char* name;
+                    const char* id;
+                } mode_options[] = {
+                    {"Plain", "plain"},
+                    {"Fancy", "fancy"}
+                };
+                for(auto [name, id]: mode_options)
+                {
+                    if(ImGui::MenuItem(name, NULL, opts->mode == id) && opts->mode != id)
+                    {
+                        opts->mode = id;
+                        SDL_Event e;
+                        e.type = SDL_USEREVENT;
+                        e.user.code = SET_RENDERING_MODE;
+                        SDL_PushEvent(&e);
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
             ImGui::EndMenu();
         }
         ImGui::TextColored(

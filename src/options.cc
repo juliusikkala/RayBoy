@@ -11,6 +11,7 @@ json options::serialize() const
     j["fullscreen"] = fullscreen;
     j["vsync"] = vsync;
     j["display_index"] = display_index;
+    j["mode"] = mode;
     return j;
 }
 
@@ -37,6 +38,7 @@ bool options::deserialize(const json& j)
         fullscreen = j.value("fullscreen", false);
         vsync = j.value("vsync", true);
         display_index = j.value("display_index", -1);
+        mode = j.value("mode", "plain");
     }
     catch(...)
     {

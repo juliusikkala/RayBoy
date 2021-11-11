@@ -3,8 +3,8 @@
 
 #include "device.hh"
 #include "math.hh"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
+#include <SDL.h>
+#include <SDL_vulkan.h>
 #include <vector>
 #include <string>
 #include <unordered_map>

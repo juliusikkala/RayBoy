@@ -211,6 +211,9 @@ bool game::handle_input()
             case gui::SET_ANTIALIASING:
                 refresh_pipeline_options();
                 break;
+            case gui::SET_RENDERING_MODE:
+                pipeline.reset();
+                break;
             }
             break;
         }
@@ -262,21 +265,27 @@ void game::render()
 
 void game::create_pipeline()
 {
-    plain_render_pipeline::options plain_options = {};
-    fancy_render_pipeline::options fancy_options = {
-        opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
-    };
-    pipeline.reset(new plain_render_pipeline(*gfx_ctx, *emu, plain_options));
+    if(opt.mode == "plain")
+    {
+        plain_render_pipeline::options plain_options = {};
+        pipeline.reset(new plain_render_pipeline(*gfx_ctx, *emu, plain_options));
+    }
+    else if(opt.mode == "fancy")
+    {
+        fancy_render_pipeline::options fancy_options = {
+            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
+        };
+        pipeline.reset(new fancy_render_pipeline(*gfx_ctx, ecs_scene, fancy_options));
+    }
 }
 
 void game::refresh_pipeline_options()
 {
-    plain_render_pipeline::options plain_options = {};
-    fancy_render_pipeline::options fancy_options = {
-        opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
-    };
     if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
     {
+        fancy_render_pipeline::options fancy_options = {
+            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
+        };
         ptr->set_options(fancy_options);
         need_pipeline_reset = true;
     }

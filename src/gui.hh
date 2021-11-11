@@ -16,7 +16,8 @@ public:
         FULLSCREEN_TOGGLE,
         VSYNC_TOGGLE,
         SET_DISPLAY,
-        SET_ANTIALIASING
+        SET_ANTIALIASING,
+        SET_RENDERING_MODE
     };
 
     void handle_event(const SDL_Event& event);
