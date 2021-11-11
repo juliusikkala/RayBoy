@@ -49,7 +49,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         1.0f,
         nullptr,
         VK_TRUE,
-        VK_TRUE
+        VK_FALSE
     };
 
     bool has_depth_stencil = false;
