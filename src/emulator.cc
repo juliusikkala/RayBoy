@@ -1,9 +1,35 @@
 #include "emulator.hh"
 #include "io.hh"
+#include <algorithm>
+#include <iostream>
 #define TICKS_PER_SECOND 0x800000
 
 namespace
 {
+
+class emulator_audio_instance: public SoLoud::AudioSourceInstance
+{
+public:
+    emulator_audio_instance(audio_ring_buffer* buf)
+    : buf(buf)
+    {
+    }
+
+    unsigned int getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize) override
+    {
+        buf->pop(aBuffer, aSamplesToRead);
+        return aSamplesToRead;
+    }
+
+    bool hasEnded() override
+    {
+        // The fun never ends!
+        return false;
+    }
+
+private:
+    audio_ring_buffer* buf;
+};
 
 uint32_t rgb_encode(GB_gameboy_t* gb, uint8_t r, uint8_t g, uint8_t b)
 {
@@ -14,9 +40,45 @@ void log_callback(GB_gameboy_t*, const char*, GB_log_attributes) {}
 
 }
 
-emulator::emulator()
-: powered(false), destroy(false), worker(&emulator::worker_func, this)
+emulator_audio::emulator_audio(uint32_t buffer_length, uint32_t samplerate)
+: buf(buffer_length*4, 2), buffer_length(buffer_length)
 {
+    mBaseSamplerate = samplerate;
+    mChannels = 2;
+}
+
+emulator_audio::~emulator_audio()
+{
+    stop();
+}
+
+void emulator_audio::push_sample(GB_sample_t* sample)
+{
+    buf.push(sample->left, sample->right);
+}
+
+int emulator_audio::get_sample_status() const
+{
+    // If we don't have enough samples for the next getAudio call, we're
+    // kinda in trouble.
+    size_t samples = buf.get_unread_sample_count();
+    if(samples < buffer_length*2) return -1;
+    if(samples > buffer_length*3) return 1;
+    if(samples >= buffer_length*4-1) return 2;
+    return 0;
+}
+
+SoLoud::AudioSourceInstance* emulator_audio::createInstance()
+{
+    return new emulator_audio_instance(&buf);
+}
+
+emulator::emulator(audio& a)
+:   powered(false), destroy(false), a(&a),
+    audio_output(SAMPLE_GRANULARITY, 48000),
+    worker(&emulator::worker_func, this)
+{
+    a.get_soloud().playBackground(audio_output);
     active_framebuffer.resize(160*144, 0xFFFFFFFF);
     finished_framebuffer.resize(160*144, 0xFFFFFFFF);
     faded_framebuffer.resize(160*144, 0xFFFFFFFF);
@@ -128,6 +190,7 @@ void emulator::worker_func()
     uint64_t surplus_time = 0;
     uint64_t surplus_ticks = 0;
     uint64_t delta_us = 0;
+    auto target_delta = std::chrono::microseconds(1000);
     while(true)
     {
         {
@@ -141,6 +204,7 @@ void emulator::worker_func()
             start = end;
 
             uint64_t time = surplus_time + delta_us*TICKS_PER_SECOND;
+
             uint64_t ticks_to_simulate = time/1000000;
             surplus_time = time%1000000;
 
@@ -155,7 +219,10 @@ void emulator::worker_func()
 
                 if(this->powered && rom.size())
                 {
-                    while(ticks_to_simulate > 0)
+                    int status = audio_output.get_sample_status();
+
+                    int clock_check_counter = 0;
+                    while(status <= 0 && (ticks_to_simulate > 0 || status < 0))
                     {
                         uint8_t ticks = GB_run(&gb);
                         age_ticks += ticks;
@@ -168,6 +235,13 @@ void emulator::worker_func()
                             surplus_ticks = ticks - ticks_to_simulate;
                             ticks_to_simulate = 0;
                         }
+                        status = audio_output.get_sample_status();
+                        if(++clock_check_counter > 64)
+                        {
+                            if(std::chrono::high_resolution_clock::now() - start > target_delta)
+                                break;
+                            clock_check_counter = 0;
+                        }
                     }
                 }
                 else
@@ -176,10 +250,14 @@ void emulator::worker_func()
                 }
             }
         }
+
         auto local_end = std::chrono::high_resolution_clock::now();
         auto local_delta = local_end - start;
-        if(local_delta < delta)
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        if(local_delta < target_delta)
+        {
+            // Aim to spend a millisecond each loop.
+            std::this_thread::sleep_for(target_delta-local_delta);
+        }
     }
 }
 
@@ -198,11 +276,10 @@ void emulator::init_gb()
     GB_set_palette(&gb, &GB_PALETTE_GREY);
     GB_set_log_callback(&gb, log_callback);
 
-    GB_set_sample_rate(&gb, 48000); //TODO: audio
+    GB_set_sample_rate(&gb, 48000);
     GB_set_interference_volume(&gb, 1.0f);
     GB_set_highpass_filter_mode(&gb, GB_HIGHPASS_ACCURATE);
 
-    GB_set_rewind_length(&gb, 0);
     GB_set_rtc_mode(&gb, GB_RTC_MODE_SYNC_TO_HOST);
     GB_apu_set_sample_callback(&gb, push_audio_sample);
 
@@ -222,7 +299,8 @@ void emulator::age_framebuffer()
 
 void emulator::push_audio_sample(GB_gameboy_t *gb, GB_sample_t* sample)
 {
-    // TODO
+    emulator& self = *(emulator*)GB_get_user_data(gb);
+    self.audio_output.push_sample(sample);
 }
 
 void emulator::handle_vblank(GB_gameboy_t *gb)

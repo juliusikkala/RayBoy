@@ -51,14 +51,44 @@ elseif(APPLE)
 endif()
 add_subdirectory(external/volk)
 
-file(GLOB SAMEBOY_CORE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/external/SameBoy/Core/*.c)
+set(SAMEBOY_CORE_SRC
+    external/SameBoy/Core/apu.c
+    external/SameBoy/Core/camera.c
+    external/SameBoy/Core/display.c
+    external/SameBoy/Core/gb.c
+    external/SameBoy/Core/joypad.c
+    external/SameBoy/Core/mbc.c
+    external/SameBoy/Core/memory.c
+    external/SameBoy/Core/printer.c
+    external/SameBoy/Core/random.c
+    external/SameBoy/Core/rumble.c
+    external/SameBoy/Core/save_state.c
+    external/SameBoy/Core/sgb.c
+    external/SameBoy/Core/sm83_cpu.c
+    external/SameBoy/Core/symbol_hash.c
+    external/SameBoy/Core/timing.c
+    external/SameBoy/Core/workboy.c
+)
 add_library(SameBoy STATIC ${SAMEBOY_CORE_SRC})
-target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_VERSION="0.14.7")
+target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_DISABLE_TIMEKEEPING GB_DISABLE_REWIND GB_DISABLE_CHEATS GB_DISABLE_DEBUGGER GB_VERSION="0.14.7")
 target_compile_options(SameBoy PRIVATE
     -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
     -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
     -Wno-implicit-function-declaration -O3
 ) 
+
+file(
+    GLOB SOLOUD_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/soloud/src/core/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/soloud/src/backend/sdl2_static/*.cpp
+)
+add_library(soloud STATIC ${SOLOUD_SRC})
+target_compile_definitions(soloud PUBLIC WITH_SDL2_STATIC)
+target_include_directories(
+    soloud PUBLIC
+    "external/soloud/include"
+    "external/SDL/include"
+)
 
 add_executable(rayboy
     external/vk_mem_alloc.cc
@@ -110,6 +140,7 @@ add_executable(rayboy
     src/blit_render_stage.cc
     src/emulator.cc
     src/emulator_render_stage.cc
+    src/audio.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -118,6 +149,7 @@ target_include_directories(rayboy PUBLIC
     "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"
     "external/nativefiledialog/src/include"
+    "external/soloud/include"
     "external/SameBoy/Core"
     "external/volk"
     "external/imgui"
@@ -126,6 +158,7 @@ target_include_directories(rayboy PUBLIC
 target_compile_features(rayboy PUBLIC cxx_std_17)
 target_link_libraries(rayboy PUBLIC SDL2)
 target_link_libraries(rayboy PUBLIC vulkan)
+target_link_libraries(rayboy PUBLIC soloud)
 target_link_libraries(rayboy PRIVATE volk)
 target_link_libraries(rayboy PRIVATE SameBoy)
 

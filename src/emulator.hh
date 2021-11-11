@@ -5,17 +5,39 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include "math.hh"
+#include "audio.hh"
 extern "C"
 {
 #include "gb.h"
 #undef internal
 }
 
+class emulator_audio: public SoLoud::AudioSource
+{
+public:
+    emulator_audio(uint32_t buffer_length, uint32_t samplerate);
+    ~emulator_audio();
+
+    void push_sample(GB_sample_t* sample);
+
+    // -1: danger of underflowing soon, emulate enough samples ASAP
+    // 0: all is well
+    // 1: danger of overflowing soon, don't emulate more samples
+    int get_sample_status() const;
+
+    SoLoud::AudioSourceInstance* createInstance() override;
+
+private:
+    uint32_t buffer_length;
+    audio_ring_buffer buf;
+};
+
 class emulator
 {
 public:
-    emulator();
+    emulator(audio& a);
     ~emulator();
 
     void reset();
@@ -47,7 +69,9 @@ private:
     bool powered;
     bool destroy;
     GB_gameboy_t gb;
+    audio* a;
     std::string rom, sav;
+    emulator_audio audio_output;
     std::vector<uint32_t> active_framebuffer;
     std::vector<uint32_t> finished_framebuffer;
     std::vector<uint32_t> faded_framebuffer;

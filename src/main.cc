@@ -4,6 +4,7 @@
 #include "gui.hh"
 #include "plain_render_pipeline.hh"
 #include "fancy_render_pipeline.hh"
+#include "audio.hh"
 #include "emulator.hh"
 #include "imgui.h"
 #include <iostream>
@@ -48,7 +49,8 @@ int main()
     ecs_updater& updater = entities.ensure_system<ecs_updater>();
     context ctx(opts.window_size, opts.fullscreen, opts.vsync);
     gui g(ctx, opts);
-    emulator emu;
+    audio a;
+    emulator emu(a);
     emu.set_power(true);
 
     gltf_data main_scene = load_gltf(ctx, "data/white_room.glb", entities);
