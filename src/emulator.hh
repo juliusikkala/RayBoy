@@ -40,6 +40,8 @@ public:
     emulator(audio& a);
     ~emulator();
 
+    void set_audio_mode(transformable* positional = nullptr);
+
     void reset();
     bool load_rom(const std::string& path);
     void load_sav(const std::string& path);
@@ -73,6 +75,7 @@ private:
     audio* a;
     std::string rom, sav;
     emulator_audio audio_output;
+    SoLoud::handle audio_handle;
     std::vector<uint32_t> active_framebuffer;
     std::vector<uint32_t> finished_framebuffer;
     std::vector<uint32_t> faded_framebuffer;

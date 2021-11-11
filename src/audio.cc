@@ -1,7 +1,9 @@
 #include "audio.hh"
+#include "transformable.hh"
 #include <cstdio>
 
 audio::audio()
+: listener(nullptr)
 {
     soloud.init(
         0,
@@ -26,9 +28,78 @@ uint32_t audio::get_buffer_size()
     return soloud.getBackendBufferSize();
 }
 
-SoLoud::Soloud& audio::get_soloud()
+void audio::update()
 {
-    return soloud;
+    vec3 listener_pos = vec3(0,0,0);
+    if(listener)
+    {
+        listener_pos = listener->get_global_position();
+        vec3 at = listener->get_global_direction();
+        vec3 up = listener->get_global_direction(vec3(0,1,0));
+        listener_pos -= at*0.1f;// Move ears 10cm back from "eyes"
+        soloud.set3dListenerParameters(
+            listener_pos.x, listener_pos.y, listener_pos.z,
+            at.x, at.y, at.z, 
+            up.x, up.y, up.z,
+            0.0f, 0.0f, 0.0f
+        );
+    }
+    else
+    {
+        soloud.set3dListenerParameters(
+            0, 0, 0,
+            0, 0, -1,
+            0, 1, 0,
+            0, 0, 0
+        );
+    }
+
+    for(const auto& pair: sources)
+    {
+        if(pair.second != nullptr)
+        {
+            vec3 pos = pair.second->get_global_position();
+            soloud.set3dSourcePosition(
+                pair.first, pos.x, pos.y, pos.z
+            );
+        }
+    }
+    soloud.update3dAudio();
+}
+
+void audio::set_listener(transformable* listener)
+{
+    this->listener = listener;
+}
+
+SoLoud::handle audio::add_source(
+    SoLoud::AudioSource& source,
+    transformable* transformable,
+    float volume
+){
+    SoLoud::handle h;
+    if(!transformable)
+    {
+        h = soloud.playBackground(source);
+    }
+    else
+    {
+        vec3 pos = transformable->get_global_position();
+        h = soloud.play3d(source, pos.x, pos.y, pos.z);
+    }
+    soloud.setInaudibleBehavior(h, true, false);
+    soloud.setVolume(h, volume);
+    sources[h] = transformable;
+    return h;
+}
+
+void audio::remove_source(SoLoud::handle h)
+{
+    if(sources.count(h))
+    {
+        soloud.stop(h);
+        sources.erase(h);
+    }
 }
 
 audio_ring_buffer::audio_ring_buffer(size_t sample_count, size_t channels)

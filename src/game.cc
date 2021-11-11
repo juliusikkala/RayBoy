@@ -88,6 +88,9 @@ void game::load_scene(const std::string& name)
     cam_transform = ecs_scene.get<transformable>(scene_data.entities["Camera"]);
     cam = ecs_scene.get<camera>(scene_data.entities["Camera_Orientation"]);
     if(gbc) gbc->set_parent(cam_transform);
+    audio_ctx->set_listener(
+        ecs_scene.get<transformable>(scene_data.entities["Camera_Orientation"])
+    );
 }
 
 bool game::handle_input()
@@ -234,6 +237,7 @@ void game::update()
     gbc->set_position(distance * viewer.direction);
 
     updater.update(ecs_scene);
+    audio_ctx->update();
 }
 
 void game::render()
@@ -269,6 +273,7 @@ void game::create_pipeline()
     {
         plain_render_pipeline::options plain_options = {};
         pipeline.reset(new plain_render_pipeline(*gfx_ctx, *emu, plain_options));
+        emu->set_audio_mode(nullptr);
     }
     else if(opt.mode == "fancy")
     {
@@ -276,6 +281,9 @@ void game::create_pipeline()
             opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
         };
         pipeline.reset(new fancy_render_pipeline(*gfx_ctx, ecs_scene, fancy_options));
+        emu->set_audio_mode(
+            ecs_scene.get<transformable>(console_data.entities["Speaker"])
+        );
     }
 }
 

@@ -31,6 +31,19 @@ private:
     audio_ring_buffer* buf;
 };
 
+class emulator_attenuator: public SoLoud::AudioAttenuator
+{
+public:
+    float attenuate(float aDistance, float aMinDistance, float aMaxDistance, float aRolloffFactor) override
+    {
+        // Not sure why, but somehow most attenuation calculations are way too
+        // intense for these distances. Maybe because the sound source is large
+        // relative to the distance?
+        aDistance += 0.2f;
+        return clamp(0.1f/(aDistance*aDistance), 0.0f, 1.0f);
+    }
+} emulator_attenuator_instance;
+
 uint32_t rgb_encode(GB_gameboy_t* gb, uint8_t r, uint8_t g, uint8_t b)
 {
     return uint32_t(r)|(uint32_t(g)<<8)|(uint32_t(b)<<16)|0xFF000000;
@@ -45,6 +58,8 @@ emulator_audio::emulator_audio(uint32_t buffer_length, uint32_t samplerate)
 {
     mBaseSamplerate = samplerate;
     mChannels = 2;
+    mAttenuator = &emulator_attenuator_instance;
+    m3dMinDistance = 0.01;
 }
 
 emulator_audio::~emulator_audio()
@@ -78,7 +93,7 @@ emulator::emulator(audio& a)
     audio_output(SAMPLE_GRANULARITY, 48000),
     worker(&emulator::worker_func, this)
 {
-    a.get_soloud().playBackground(audio_output);
+    audio_handle = a.add_source(audio_output);
     active_framebuffer.resize(160*144, 0xFFFFFFFF);
     finished_framebuffer.resize(160*144, 0xFFFFFFFF);
     faded_framebuffer.resize(160*144, 0xFFFFFFFF);
@@ -92,6 +107,12 @@ emulator::~emulator()
     }
     worker.join();
     set_power(false);
+}
+
+void emulator::set_audio_mode(transformable* positional)
+{
+    a->remove_source(audio_handle);
+    audio_handle = a->add_source(audio_output, positional);
 }
 
 void emulator::reset()

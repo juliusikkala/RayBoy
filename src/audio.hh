@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <vector>
 #include <atomic>
+#include <unordered_map>
 
+class transformable;
 class audio
 {
 public:
@@ -13,9 +15,18 @@ public:
 
     uint32_t get_samplerate();
     uint32_t get_buffer_size();
-    SoLoud::Soloud& get_soloud();
+    void update();
+    void set_listener(transformable* listener = nullptr);
+    SoLoud::handle add_source(
+        SoLoud::AudioSource& source,
+        transformable* transformable = nullptr,
+        float volume = 1.0f
+    );
+    void remove_source(SoLoud::handle h);
 
 private:
+    transformable* listener;
+    std::unordered_map<SoLoud::handle, transformable*> sources;
     SoLoud::Soloud soloud;
 };
 
