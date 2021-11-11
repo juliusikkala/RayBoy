@@ -1,16 +1,19 @@
-cmake_minimum_required(VERSION 3.7...3.21)
-
-if(${CMAKE_VERSION} VERSION_LESS 3.12)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-endif()
+cmake_minimum_required(VERSION 3.19)
 
 project(RayBoy LANGUAGES C CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_subdirectory(external/SDL)
-add_subdirectory(external/Vulkan-Headers)
-add_subdirectory(external/Vulkan-Loader)
+find_package(Threads)
+find_package(SDL2)
+if (NOT SDL2_FOUND)
+    add_subdirectory(external/SDL)
+endif()
+find_package(Vulkan)
+if (NOT Vulkan_FOUND)
+    add_subdirectory(external/Vulkan-Headers)
+    add_subdirectory(external/Vulkan-Loader)
+endif()
 
 set(shader_src
     src/xor.comp
@@ -147,7 +150,6 @@ add_executable(rayboy
 target_include_directories(rayboy PUBLIC
     "external"
     "external/glm"
-    "external/Vulkan-Headers/include"
     "external/VulkanMemoryAllocator/include"
     "external/nativefiledialog/src/include"
     "external/soloud/include"
@@ -157,9 +159,19 @@ target_include_directories(rayboy PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_compile_features(rayboy PUBLIC cxx_std_17)
-target_link_libraries(rayboy PUBLIC SDL2)
-target_link_libraries(rayboy PUBLIC vulkan)
+if (SDL2_FOUND)
+    target_link_libraries(rayboy PUBLIC SDL2::SDL2)
+else()
+    target_link_libraries(rayboy PUBLIC SDL2)
+endif()
+if (Vulkan_FOUND)
+    target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+else()
+    target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
+    target_link_libraries(rayboy PUBLIC vulkan)
+endif()
 target_link_libraries(rayboy PUBLIC soloud)
+target_link_libraries(rayboy PUBLIC Threads::Threads)
 target_link_libraries(rayboy PRIVATE volk)
 target_link_libraries(rayboy PRIVATE SameBoy)
 
