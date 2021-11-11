@@ -36,7 +36,7 @@ void handle_emulator_input(emulator& emu, const SDL_Event& event)
 
 }
 
-game::game()
+game::game(const char* initial_rom)
 :   updater(ecs_scene.ensure_system<ecs_updater>()),
     need_swapchain_reset(false), need_pipeline_reset(false), gbc(nullptr),
     cam_transform(nullptr), cam(nullptr)
@@ -47,6 +47,12 @@ game::game()
     ui.reset(new gui(*gfx_ctx, opt));
     emu.reset(new emulator(*audio_ctx));
     emu->set_power(true);
+
+    if(initial_rom && emu->load_rom(initial_rom))
+    {
+        opt.push_recent_rom(initial_rom);
+        emu->print_info();
+    }
 
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     save_timer = SDL_AddTimer(AUTOSAVE_INTERVAL, autosave, this);

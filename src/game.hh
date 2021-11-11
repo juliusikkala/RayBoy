@@ -15,7 +15,7 @@
 class game
 {
 public:
-    game();
+    game(const char* initial_rom);
     ~game();
 
     void load_common_assets();

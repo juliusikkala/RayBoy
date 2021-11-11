@@ -509,6 +509,7 @@ void context::init_swapchain()
     vkCreateSwapchainKHR(dev->logical_device, &swapchain_info, nullptr, &swapchain);
 
     // Get swapchain images
+    vkGetSwapchainImagesKHR(dev->logical_device, swapchain, &image_count, nullptr);
     swapchain_images.resize(image_count);
     vkGetSwapchainImagesKHR(dev->logical_device, swapchain, &image_count, swapchain_images.data());
 
