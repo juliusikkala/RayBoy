@@ -114,6 +114,12 @@ bool emulator::load_rom(const std::string& path)
     if(GB_load_rom(&gb, path.c_str()) == 0)
     {
         rom = path;
+
+        fs::path rom_path(rom);
+        rom_path.replace_extension(".sav");
+        sav = rom_path.string();
+        GB_load_battery(&gb, sav.c_str());
+
         return true;
     }
     else return false;
@@ -125,6 +131,16 @@ void emulator::load_sav(const std::string& path)
     reset();
     GB_load_battery(&gb, path.c_str());
     sav = path;
+}
+
+void emulator::save_sav()
+{
+    std::unique_lock lock(mutex);
+    if(!sav.empty())
+    {
+        printf("Saving to %s\n", sav.c_str());
+        GB_save_battery(&gb, sav.c_str());
+    }
 }
 
 void emulator::set_power(bool on)
@@ -290,6 +306,7 @@ void emulator::deinit_gb()
 {
     GB_free(&gb);
     powered = false;
+    sav = "";
 }
 
 void emulator::age_framebuffer()

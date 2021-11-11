@@ -43,6 +43,7 @@ public:
     void reset();
     bool load_rom(const std::string& path);
     void load_sav(const std::string& path);
+    void save_sav();
     void set_power(bool on);
 
     void set_button(GB_key_t button, bool pressed);

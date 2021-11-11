@@ -10,6 +10,11 @@ void gltf_data::remove(ecs& e)
     for(const auto& pair: entities)
         e.remove(pair.second);
     e.remove(scene);
+    textures.clear();
+    samplers.clear();
+    meshes.clear();
+    animation_pools.clear();
+    entities.clear();
 }
 
 namespace

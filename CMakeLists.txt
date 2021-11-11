@@ -141,6 +141,7 @@ add_executable(rayboy
     src/emulator.cc
     src/emulator_render_stage.cc
     src/audio.cc
+    src/game.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
