@@ -16,6 +16,7 @@ struct options
     bool pixel_transitions = true;
     int display_index = -1;
     std::string mode = "plain";
+    std::string gb_color = "atomic-purple";
 
     json serialize() const;
     bool deserialize(const json& j);

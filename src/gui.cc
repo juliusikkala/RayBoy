@@ -151,6 +151,39 @@ void gui::update()
                 }
             }
 
+            if(opts->mode == "fancy")
+            {
+                if(ImGui::BeginMenu("Console color"))
+                {
+                    static constexpr struct {
+                        const char* name;
+                        const char* id;
+                    } color_options[] = {
+                        {"Grape", "grape"},
+                        {"Teal", "teal"},
+                        {"Kiwi", "kiwi"},
+                        {"Berry", "berry"},
+                        {"Dandelion", "dandelion"},
+                        {"Atomic purple", "atomic-purple"},
+                        {"Aluminum", "aluminum"},
+                        {"Black", "black"},
+                        {"White", "white"}
+                    };
+                    for(auto [name, id]: color_options)
+                    {
+                        if(ImGui::MenuItem(name, NULL, opts->gb_color == id))
+                        {
+                            opts->gb_color = id;
+                            SDL_Event e;
+                            e.type = SDL_USEREVENT;
+                            e.user.code = SET_GB_COLOR;
+                            SDL_PushEvent(&e);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
+            }
+
             if(ImGui::BeginMenu("Resolution"))
             {
                 static constexpr struct {

@@ -106,6 +106,7 @@ void game::load_common_assets()
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
     gbc->set_position(vec3(0, -0.1, 0));
+    update_gbc_material();
 }
 
 void game::load_scene(const std::string& name)
@@ -275,6 +276,9 @@ bool game::handle_input()
             case gui::SET_RENDERING_MODE:
                 pipeline.reset();
                 break;
+            case gui::SET_GB_COLOR:
+                update_gbc_material();
+                break;
             }
             break;
         }
@@ -405,6 +409,77 @@ void game::refresh_pipeline_options()
         ptr->set_options(fancy_options);
     }
     need_pipeline_reset = true;
+}
+
+void game::update_gbc_material()
+{
+    model* battery_cover = ecs_scene.get<model>(console_data.entities["Battery cover"]);
+    model* back_panel = ecs_scene.get<model>(console_data.entities["Back panel"]);
+    model* front_panel = ecs_scene.get<model>(console_data.entities["Front panel"]);
+
+    vec3 color = vec3(0);
+    float metallic = 0.0f;
+    float transmittance = 0.0f;
+
+    if(opt.gb_color == "grape")
+    {
+        color = vec3(0.07, 0, 0.25);
+    }
+    else if(opt.gb_color == "teal")
+    {
+        color = vec3(0.0, 0.128, 0.17);
+    }
+    else if(opt.gb_color == "kiwi")
+    {
+        color = vec3(0.15, 0.56, 0.0);
+    }
+    else if(opt.gb_color == "berry")
+    {
+        color = vec3(0.6, 0., 0.045);
+    }
+    else if(opt.gb_color == "dandelion")
+    {
+        color = vec3(0.7, 0.25, 0);
+    }
+    else if(opt.gb_color == "atomic-purple")
+    {
+        color = vec3(0.805, 0.74, 0.85);
+        transmittance = 1.0f;
+    }
+    else if(opt.gb_color == "aluminum")
+    {
+        color = vec3(0.7);
+        metallic = 1.0f;
+    }
+    else if(opt.gb_color == "black")
+    {
+        color = vec3(0.01);
+    }
+    else if(opt.gb_color == "white")
+    {
+        color = vec3(0.95);
+    }
+
+    for(auto& vg: *battery_cover)
+    {
+        vg.mat.color_factor = vec4(color, 1);
+        vg.mat.metallic_factor = metallic;
+        vg.mat.transmittance = transmittance;
+    }
+
+    for(auto& vg: *back_panel)
+    {
+        vg.mat.color_factor = vec4(color, 1);
+        vg.mat.metallic_factor = metallic;
+        vg.mat.transmittance = transmittance;
+    }
+
+    for(auto& vg: *front_panel)
+    {
+        vg.mat.color_factor = vec4(color, 1);
+        vg.mat.metallic_factor = metallic;
+        vg.mat.transmittance = transmittance;
+    }
 }
 
 uint32_t game::autosave(uint32_t interval, void* param)

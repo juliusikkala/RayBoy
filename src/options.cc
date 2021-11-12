@@ -15,6 +15,7 @@ json options::serialize() const
     j["pixel_transitions"] = pixel_transitions;
     j["display_index"] = display_index;
     j["mode"] = mode;
+    j["gb_color"] = gb_color;
     return j;
 }
 
@@ -45,6 +46,7 @@ bool options::deserialize(const json& j)
         pixel_transitions = j.value("pixel_transitions", true);
         display_index = j.value("display_index", -1);
         mode = j.value("mode", "plain");
+        gb_color = j.value("gb_color", "atomic-purple");
     }
     catch(...)
     {

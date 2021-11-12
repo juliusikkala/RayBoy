@@ -83,6 +83,7 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
 {
     material mat;
     mat.color = spec.color_factor;
+    mat.color.rgb = inverse_srgb_correction(mat.color.rgb);
     if(spec.textures.x != -1)
     {
         vec4 tex_col = texture(textures[nonuniformEXT(spec.textures.x)], uv);

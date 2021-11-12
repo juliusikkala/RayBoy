@@ -27,6 +27,7 @@ public:
 private:
     void create_pipeline();
     void refresh_pipeline_options();
+    void update_gbc_material();
     static uint32_t autosave(uint32_t interval, void* param);
 
     ecs ecs_scene;

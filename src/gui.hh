@@ -20,7 +20,8 @@ public:
         PIXEL_TRANSITIONS_TOGGLE,
         SET_DISPLAY,
         SET_ANTIALIASING,
-        SET_RENDERING_MODE
+        SET_RENDERING_MODE,
+        SET_GB_COLOR
     };
 
     void handle_event(const SDL_Event& event);
