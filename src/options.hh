@@ -11,6 +11,8 @@ struct options
     unsigned msaa_samples = 1;
     bool fullscreen = false;
     bool vsync = true;
+    bool colormapping = true;
+    bool render_subpixels = false;
     int display_index = -1;
     std::string mode = "plain";
 

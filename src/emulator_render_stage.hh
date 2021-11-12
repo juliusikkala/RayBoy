@@ -5,6 +5,8 @@
 #include "compute_pipeline.hh"
 #include "gpu_buffer.hh"
 #include "timer.hh"
+#include "texture.hh"
+#include "sampler.hh"
 #include "emulator.hh"
 
 class render_target;
@@ -19,6 +21,7 @@ public:
         render_target& output_target,
         bool generate_mipmaps = true,
         bool color_mapping = false,
+        bool apply_gamma = false,
         bool faded = false
     );
 
@@ -30,6 +33,9 @@ private:
     bool faded;
     compute_pipeline transform_pipeline;
     gpu_buffer image_buffer;
+    texture color_lut;
+    texture subpixel;
+    sampler subpixel_sampler;
     timer stage_timer;
 };
 

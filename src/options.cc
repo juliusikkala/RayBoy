@@ -10,6 +10,8 @@ json options::serialize() const
     j["msaa_samples"] = msaa_samples;
     j["fullscreen"] = fullscreen;
     j["vsync"] = vsync;
+    j["colormapping"] = colormapping;
+    j["render_subpixels"] = render_subpixels;
     j["display_index"] = display_index;
     j["mode"] = mode;
     return j;
@@ -37,6 +39,8 @@ bool options::deserialize(const json& j)
         msaa_samples = j.value("msaa_samples", 1);
         fullscreen = j.value("fullscreen", false);
         vsync = j.value("vsync", true);
+        colormapping = j.value("colormapping", true);
+        render_subpixels = j.value("render_subpixels", false);
         display_index = j.value("display_index", -1);
         mode = j.value("mode", "plain");
     }

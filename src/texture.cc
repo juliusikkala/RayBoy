@@ -2,8 +2,8 @@
 #include "helpers.hh"
 #include "stb_image.h"
 
-texture::texture(context& ctx, const std::string& path)
-: ctx(&ctx)
+texture::texture(context& ctx, const std::string& path, VkImageLayout layout)
+: ctx(&ctx), layout(layout)
 {
     load_from_file(path);
 }
@@ -141,7 +141,8 @@ void texture::load_from_file(const std::string& path)
 
     tiling = VK_IMAGE_TILING_OPTIMAL;
     usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if(layout == VK_IMAGE_LAYOUT_GENERAL)
+        usage |= VK_IMAGE_USAGE_STORAGE_BIT;
     samples = VK_SAMPLE_COUNT_1_BIT;
 
     images.emplace_back(create_gpu_image(

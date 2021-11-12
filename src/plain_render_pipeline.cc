@@ -17,10 +17,20 @@ void plain_render_pipeline::set_options(const options& opt)
 void plain_render_pipeline::reset()
 {
     // Initialize buffers
+    uvec2 emu_texture_size = emu->get_screen_size();
+    if(opt.subpixels)
+    {
+        vec2 scales = vec2(ctx->get_size())/vec2(emu_texture_size);
+        float scale = min(scales.x, scales.y);
+        if(opt.integer_scaling && scale > 1.0f)
+            scale = int(scale);
+        emu_texture_size = ivec2(vec2(emu_texture_size) * scale);
+    }
+
     render_target screen_target = ctx->get_render_target();
     color_buffer.reset(new texture(
         *ctx,
-        emu->get_screen_size(),
+        emu_texture_size,
         VK_FORMAT_R8G8B8A8_UNORM,
         0, nullptr,
         VK_IMAGE_TILING_OPTIMAL,
@@ -42,6 +52,7 @@ void plain_render_pipeline::reset()
         color_target,
         false,
         opt.color_mapped,
+        true,
         opt.faded
     ));
     blit_stage.reset(new blit_render_stage(

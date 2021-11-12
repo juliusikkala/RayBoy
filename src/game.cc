@@ -201,6 +201,9 @@ bool game::handle_input()
             switch(event.user.code)
             {
             case gui::SET_RESOLUTION_SCALING:
+            case gui::SET_ANTIALIASING:
+            case gui::COLORMAPPING_TOGGLE:
+            case gui::SUBPIXELS_TOGGLE:
                 refresh_pipeline_options();
                 break;
             case gui::SET_DISPLAY:
@@ -216,9 +219,6 @@ bool game::handle_input()
             case gui::VSYNC_TOGGLE:
                 gfx_ctx->set_vsync(opt.vsync);
                 need_swapchain_reset = true;
-                break;
-            case gui::SET_ANTIALIASING:
-                refresh_pipeline_options();
                 break;
             case gui::SET_RENDERING_MODE:
                 pipeline.reset();
@@ -277,7 +277,11 @@ void game::create_pipeline()
 {
     if(opt.mode == "plain")
     {
-        plain_render_pipeline::options plain_options = {};
+        plain_render_pipeline::options plain_options = {
+            false,
+            opt.colormapping,
+            opt.render_subpixels
+        };
         pipeline.reset(new plain_render_pipeline(*gfx_ctx, *emu, plain_options));
         emu->set_audio_mode(nullptr);
     }
@@ -295,14 +299,23 @@ void game::create_pipeline()
 
 void game::refresh_pipeline_options()
 {
+    if(auto* ptr = dynamic_cast<plain_render_pipeline*>(pipeline.get()))
+    {
+        plain_render_pipeline::options plain_options = {
+            false,
+            opt.colormapping,
+            opt.render_subpixels
+        };
+        ptr->set_options(plain_options);
+    }
     if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
     {
         fancy_render_pipeline::options fancy_options = {
             opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
         };
         ptr->set_options(fancy_options);
-        need_pipeline_reset = true;
     }
+    need_pipeline_reset = true;
 }
 
 uint32_t game::autosave(uint32_t interval, void* param)

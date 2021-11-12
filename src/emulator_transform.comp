@@ -9,10 +9,15 @@ layout(binding = 1) buffer uniform_buffer {
     uint pixels[];
 } input_data;
 
+layout(binding = 2, rgba32f) uniform readonly image2D color_lut;
+layout(binding = 3) uniform sampler2D subpixel;
+
 layout(push_constant) uniform push_constants
 {
     ivec2 input_size;
     uint use_color_mapping;
+    uint apply_gamma;
+    int mip_layer;
 } pc;
 
 void main()
@@ -25,6 +30,38 @@ void main()
         ivec2 i = p*pc.input_size/output_size;
     
         uint pixel = input_data.pixels[i.y * pc.input_size.x + i.x];
-        imageStore(image_output, p, unpackUnorm4x8(pixel));
+        vec4 driven_color = unpackUnorm4x8(pixel);
+        vec4 lcd_color = vec4(0);
+        if(pc.use_color_mapping != 0)
+        {
+            ivec3 pos = ivec3(round((1.0f-driven_color)*31.0));
+
+            if(pc.input_size != output_size)
+            {
+                // Render subpixels!
+                vec2 fi = vec2(p*pc.input_size)/vec2(output_size);
+                fi.x *= 3;
+                int column = int(fi.x)%3;
+                fi = fract(fi);
+                fi.y = 1.0 - fi.y;
+                lcd_color = imageLoad(color_lut, ivec2(column, pos[column]));
+                lcd_color *= textureLod(subpixel, fi, pc.mip_layer);
+            }
+            else
+            {
+                lcd_color += imageLoad(color_lut, ivec2(0,pos.r));
+                lcd_color += imageLoad(color_lut, ivec2(1,pos.g));
+                lcd_color += imageLoad(color_lut, ivec2(2,pos.b));
+                lcd_color /= 3.0f;
+            }
+
+            if(pc.apply_gamma != 0)
+            {
+                lcd_color = pow(lcd_color, vec4(1.0/2.2));
+            }
+        }
+        else lcd_color = driven_color;
+
+        imageStore(image_output, p, lcd_color);
     }
 }

@@ -123,6 +123,26 @@ void gui::update()
                 SDL_PushEvent(&e);
             }
 
+            if(opts->mode == "plain")
+            {
+                if(ImGui::MenuItem("Realistic colors", NULL, opts->colormapping))
+                {
+                    opts->colormapping = !opts->colormapping;
+                    SDL_Event e;
+                    e.type = SDL_USEREVENT;
+                    e.user.code = COLORMAPPING_TOGGLE;
+                    SDL_PushEvent(&e);
+                }
+                if(ImGui::MenuItem("Subpixels", NULL, opts->render_subpixels))
+                {
+                    opts->render_subpixels = !opts->render_subpixels;
+                    SDL_Event e;
+                    e.type = SDL_USEREVENT;
+                    e.user.code = SUBPIXELS_TOGGLE;
+                    SDL_PushEvent(&e);
+                }
+            }
+
             if(ImGui::BeginMenu("Resolution"))
             {
                 static constexpr struct {

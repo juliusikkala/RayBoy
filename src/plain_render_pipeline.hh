@@ -15,6 +15,7 @@ public:
     {
         bool faded = false;
         bool color_mapped = false;
+        bool subpixels = true;
         bool integer_scaling = true;
     };
 

@@ -6,7 +6,11 @@
 class texture
 {
 public:
-    texture(context& ctx, const std::string& path);
+    texture(
+        context& ctx,
+        const std::string& path,
+        VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
     texture(
         context& ctx,
         uvec2 size,
