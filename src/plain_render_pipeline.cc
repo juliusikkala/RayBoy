@@ -52,8 +52,7 @@ void plain_render_pipeline::reset()
         color_target,
         false,
         opt.color_mapped,
-        true,
-        opt.faded
+        true
     ));
     blit_stage.reset(new blit_render_stage(
         *ctx, color_target, screen_target, false, opt.integer_scaling

@@ -53,8 +53,10 @@ public:
 
     static uvec2 get_screen_size();
 
+    void set_framebuffer_fade(bool enable);
+
     void lock_framebuffer();
-    uint32_t* get_framebuffer_data(bool faded);
+    uint32_t* get_framebuffer_data();
     void unlock_framebuffer();
 
 private:
@@ -71,6 +73,7 @@ private:
     uint64_t age_ticks;
     bool powered;
     bool destroy;
+    bool fade_enabled;
     GB_gameboy_t gb;
     audio* a;
     std::string rom, sav;
@@ -78,7 +81,9 @@ private:
     SoLoud::handle audio_handle;
     std::vector<uint32_t> active_framebuffer;
     std::vector<uint32_t> finished_framebuffer;
-    std::vector<uint32_t> faded_framebuffer;
+    std::vector<vec4> cur_faded_framebuffer;
+    std::vector<vec4> prev_faded_framebuffer;
+    std::vector<uint32_t> present_faded_framebuffer;
 
     // Yeah, I'm lazy like that...
     std::recursive_mutex mutex;

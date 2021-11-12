@@ -21,8 +21,7 @@ public:
         render_target& output_target,
         bool generate_mipmaps = true,
         bool color_mapping = false,
-        bool apply_gamma = false,
-        bool faded = false
+        bool apply_gamma = false
     );
 
 protected:
@@ -30,7 +29,6 @@ protected:
 
 private:
     emulator* emu;
-    bool faded;
     compute_pipeline transform_pipeline;
     gpu_buffer image_buffer;
     texture color_lut;

@@ -13,6 +13,7 @@ struct options
     bool vsync = true;
     bool colormapping = true;
     bool render_subpixels = false;
+    bool pixel_transitions = true;
     int display_index = -1;
     std::string mode = "plain";
 

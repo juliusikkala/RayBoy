@@ -21,9 +21,8 @@ emulator_render_stage::emulator_render_stage(
     render_target& target,
     bool generate_mipmaps,
     bool color_mapping,
-    bool apply_gamma,
-    bool faded
-):  render_stage(ctx), emu(&emu), faded(faded),
+    bool apply_gamma
+):  render_stage(ctx), emu(&emu),
     transform_pipeline(ctx),
     image_buffer(
         ctx,
@@ -92,6 +91,6 @@ emulator_render_stage::emulator_render_stage(
 void emulator_render_stage::update_buffers(uint32_t image_index)
 {
     emu->lock_framebuffer();
-    image_buffer.update(image_index, emu->get_framebuffer_data(faded));
+    image_buffer.update(image_index, emu->get_framebuffer_data());
     emu->unlock_framebuffer();
 }

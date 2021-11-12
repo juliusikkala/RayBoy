@@ -12,6 +12,7 @@ json options::serialize() const
     j["vsync"] = vsync;
     j["colormapping"] = colormapping;
     j["render_subpixels"] = render_subpixels;
+    j["pixel_transitions"] = pixel_transitions;
     j["display_index"] = display_index;
     j["mode"] = mode;
     return j;
@@ -41,6 +42,7 @@ bool options::deserialize(const json& j)
         vsync = j.value("vsync", true);
         colormapping = j.value("colormapping", true);
         render_subpixels = j.value("render_subpixels", false);
+        pixel_transitions = j.value("pixel_transitions", true);
         display_index = j.value("display_index", -1);
         mode = j.value("mode", "plain");
     }

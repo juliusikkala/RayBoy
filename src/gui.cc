@@ -141,6 +141,14 @@ void gui::update()
                     e.user.code = SUBPIXELS_TOGGLE;
                     SDL_PushEvent(&e);
                 }
+                if(ImGui::MenuItem("Pixel transition", NULL, opts->pixel_transitions))
+                {
+                    opts->pixel_transitions = !opts->pixel_transitions;
+                    SDL_Event e;
+                    e.type = SDL_USEREVENT;
+                    e.user.code = PIXEL_TRANSITIONS_TOGGLE;
+                    SDL_PushEvent(&e);
+                }
             }
 
             if(ImGui::BeginMenu("Resolution"))

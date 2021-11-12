@@ -89,14 +89,16 @@ SoLoud::AudioSourceInstance* emulator_audio::createInstance()
 }
 
 emulator::emulator(audio& a)
-:   powered(false), destroy(false), a(&a),
+:   powered(false), destroy(false), fade_enabled(false), a(&a),
     audio_output(SAMPLE_GRANULARITY, 48000),
     worker(&emulator::worker_func, this)
 {
     audio_handle = a.add_source(audio_output);
     active_framebuffer.resize(160*144, 0xFFFFFFFF);
     finished_framebuffer.resize(160*144, 0xFFFFFFFF);
-    faded_framebuffer.resize(160*144, 0xFFFFFFFF);
+    cur_faded_framebuffer.resize(160*144, vec4(1));
+    prev_faded_framebuffer.resize(160*144, vec4(1));
+    present_faded_framebuffer.resize(160*144, 0xFFFFFFFF);
 }
 
 emulator::~emulator()
@@ -200,17 +202,23 @@ uvec2 emulator::get_screen_size()
     return uvec2(160, 144);
 }
 
+void emulator::set_framebuffer_fade(bool enable)
+{
+    std::unique_lock lock(mutex);
+    fade_enabled = enable;
+}
+
 void emulator::lock_framebuffer()
 {
     mutex.lock();
 }
 
-uint32_t* emulator::get_framebuffer_data(bool faded)
+uint32_t* emulator::get_framebuffer_data()
 {
-    if(faded)
+    if(fade_enabled)
     {
         age_framebuffer();
-        return faded_framebuffer.data();
+        return present_faded_framebuffer.data();
     }
     else return finished_framebuffer.data();
 }
@@ -332,7 +340,25 @@ void emulator::deinit_gb()
 
 void emulator::age_framebuffer()
 {
-    age_ticks = 0;
+    float age = float(age_ticks)/float(TICKS_PER_SECOND);
+
+    vec3 up_mix_ratio = pow(vec3(0.5), age/vec3(0.0052, 0.0042, 0.0028));
+    vec3 down_mix_ratio = pow(vec3(0.5), age/vec3(0.0076, 0.0076, 0.006));
+
+    for(unsigned y = 0; y < 144; ++y)
+    for(unsigned x = 0; x < 160; ++x)
+    {
+        unsigned index = y*160+x;
+        vec4 prev = prev_faded_framebuffer[index];
+        uint32_t drive_uint = finished_framebuffer[index];
+        vec4 drive = unpackUnorm4x8(drive_uint);
+
+        vec3 ratio = mix(down_mix_ratio, up_mix_ratio, vec3(greaterThan(drive, prev)));
+        vec4 mixed = mix(drive, prev, vec4(ratio, 1));
+        cur_faded_framebuffer[index] = mixed;
+
+        present_faded_framebuffer[index] = packUnorm4x8(mixed);
+    }
 }
 
 void emulator::push_audio_sample(GB_gameboy_t *gb, GB_sample_t* sample)
@@ -345,7 +371,16 @@ void emulator::handle_vblank(GB_gameboy_t *gb)
 {
     emulator& self = *(emulator*)GB_get_user_data(gb);
 
-    self.age_framebuffer();
+    if(self.fade_enabled)
+    {
+        self.age_framebuffer();
+        memcpy(
+            self.prev_faded_framebuffer.data(),
+            self.cur_faded_framebuffer.data(),
+            self.cur_faded_framebuffer.size()*sizeof(vec4)
+        );
+    }
+    self.age_ticks = 0;
     memcpy(
         self.finished_framebuffer.data(),
         self.active_framebuffer.data(),
