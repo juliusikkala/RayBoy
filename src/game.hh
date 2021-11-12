@@ -41,6 +41,10 @@ private:
     std::unique_ptr<render_pipeline> pipeline;
     gltf_data console_data;
     gltf_data scene_data;
+    float delta_time;
+    std::chrono::steady_clock::time_point frame_start;
+
+    std::map<int /*index*/, SDL_GameController*> controllers;
 
     transformable* gbc;
     transformable* cam_transform;
@@ -49,7 +53,7 @@ private:
     {
         float pitch = 0, yaw = 0;
         float sensitivity = 0.3;
-        int distance_steps = 0;
+        float distance_steps = 0;
         vec3 direction = vec3(0);
     } viewer;
     SDL_TimerID save_timer;

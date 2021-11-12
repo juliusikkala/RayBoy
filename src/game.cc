@@ -5,9 +5,15 @@
 namespace
 {
 
+float deadzone(float value, float dz)
+{
+    float magnitude = max(abs(value)-dz, 0.0f)/(1.0f-dz);
+    return sign(value)*magnitude;
+}
+
 void handle_emulator_input(emulator& emu, const SDL_Event& event)
 {
-    std::unordered_map<SDL_Keycode, GB_key_t> bindings = {
+    std::unordered_map<SDL_Keycode, GB_key_t> kb_bindings = {
         {SDLK_z, GB_KEY_A},
         {SDLK_x, GB_KEY_B},
         {SDLK_COMMA, GB_KEY_B},
@@ -27,10 +33,31 @@ void handle_emulator_input(emulator& emu, const SDL_Event& event)
         {SDLK_h, GB_KEY_LEFT},
         {SDLK_l, GB_KEY_RIGHT}
     };
-    auto it = bindings.find(event.key.keysym.sym);
-    if(it != bindings.end())
+    std::unordered_map<SDL_GameControllerButton, GB_key_t> ctrl_bindings = {
+        {SDL_CONTROLLER_BUTTON_A, GB_KEY_A},
+        {SDL_CONTROLLER_BUTTON_B, GB_KEY_B},
+        {SDL_CONTROLLER_BUTTON_START, GB_KEY_START},
+        {SDL_CONTROLLER_BUTTON_BACK, GB_KEY_SELECT},
+        {SDL_CONTROLLER_BUTTON_DPAD_UP, GB_KEY_UP},
+        {SDL_CONTROLLER_BUTTON_DPAD_DOWN, GB_KEY_DOWN},
+        {SDL_CONTROLLER_BUTTON_DPAD_LEFT, GB_KEY_LEFT},
+        {SDL_CONTROLLER_BUTTON_DPAD_RIGHT, GB_KEY_RIGHT},
+    };
+    if(event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
     {
-        emu.set_button(it->second, event.type == SDL_KEYDOWN);
+        auto it = kb_bindings.find(event.key.keysym.sym);
+        if(it != kb_bindings.end())
+        {
+            emu.set_button(it->second, event.type == SDL_KEYDOWN);
+        }
+    }
+    else if(event.type == SDL_CONTROLLERBUTTONDOWN || event.type == SDL_CONTROLLERBUTTONUP)
+    {
+        auto it = ctrl_bindings.find((SDL_GameControllerButton)event.cbutton.button);
+        if(it != ctrl_bindings.end())
+        {
+            emu.set_button(it->second, event.type == SDL_CONTROLLERBUTTONDOWN);
+        }
     }
 }
 
@@ -38,9 +65,10 @@ void handle_emulator_input(emulator& emu, const SDL_Event& event)
 
 game::game(const char* initial_rom)
 :   updater(ecs_scene.ensure_system<ecs_updater>()),
-    need_swapchain_reset(false), need_pipeline_reset(false), gbc(nullptr),
-    cam_transform(nullptr), cam(nullptr)
+    need_swapchain_reset(false), need_pipeline_reset(false),
+    delta_time(0), gbc(nullptr), cam_transform(nullptr), cam(nullptr)
 {
+    frame_start = std::chrono::steady_clock::now();
     load_options(opt);
     gfx_ctx.reset(new context(opt.window_size, opt.fullscreen, opt.vsync));
     audio_ctx.reset(new audio());
@@ -60,6 +88,10 @@ game::game(const char* initial_rom)
 
 game::~game()
 {
+    for(auto pair: controllers)
+    {
+        SDL_GameControllerClose(pair.second);
+    }
     SDL_RemoveTimer(save_timer);
     emu->save_sav();
     write_options(opt);
@@ -116,7 +148,6 @@ bool game::handle_input()
             {
                 viewer.pitch += event.motion.yrel * viewer.sensitivity;
                 viewer.yaw += event.motion.xrel * viewer.sensitivity;
-                viewer.pitch = clamp(viewer.pitch, -110.0f, 110.0f);
             }
 
             if(event.motion.state&SDL_BUTTON_RMASK)
@@ -142,14 +173,34 @@ bool game::handle_input()
 
                 viewer.direction.x -= delta.x;
                 viewer.direction.z -= delta.y;
-                viewer.direction.x = clamp(viewer.direction.x, -0.5f, 0.5f);
-                viewer.direction.z = clamp(viewer.direction.z, -0.5f, 0.5f);
             }
             break;
 
         case SDL_MOUSEWHEEL:
             viewer.distance_steps -= event.wheel.y;
-            viewer.distance_steps = clamp(viewer.distance_steps, 0, 10);
+            break;
+
+        case SDL_CONTROLLERDEVICEADDED:
+            if(SDL_GameController* ctrl = SDL_GameControllerOpen(event.cdevice.which))
+            {
+                controllers[event.cdevice.which] = ctrl;
+            }
+            break;
+
+        case SDL_CONTROLLERDEVICEREMOVED:
+            {
+            auto it = controllers.find(event.cdevice.which);
+            if(it != controllers.end())
+            {
+                SDL_GameControllerClose(it->second);
+                controllers.erase(it);
+            }
+            }
+            break;
+
+        case SDL_CONTROLLERBUTTONDOWN:
+        case SDL_CONTROLLERBUTTONUP:
+            handle_emulator_input(*emu, event);
             break;
 
         case SDL_KEYDOWN:
@@ -228,14 +279,50 @@ bool game::handle_input()
             break;
         }
     }
+
+    for(auto pair: controllers)
+    {
+        float xmot = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_LEFTX)/32768.0;
+        float ymot = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_LEFTY)/32768.0;
+        xmot = deadzone(xmot, 0.2);
+        ymot = deadzone(ymot, 0.2);
+        viewer.direction.x += xmot * delta_time * 0.5;
+        viewer.direction.z += ymot * delta_time * 0.5;
+
+        float xrot = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_RIGHTX)/32768.0;
+        float yrot = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_RIGHTY)/32768.0;
+        xrot = deadzone(xrot, 0.2);
+        yrot = deadzone(yrot, 0.2);
+        viewer.pitch += yrot * 200 * delta_time;
+        viewer.yaw += xrot * 200 * delta_time;
+
+        float zoomin = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_TRIGGERRIGHT)/32768.0;
+        float zoomout = SDL_GameControllerGetAxis(pair.second, SDL_CONTROLLER_AXIS_TRIGGERLEFT)/32768.0;
+        zoomin = deadzone(zoomin, 0.1);
+        zoomout = deadzone(zoomout, 0.1);
+        float zoom = zoomout - zoomin;
+
+        viewer.distance_steps += zoom * 10 * delta_time;
+    }
+
     return true;
 }
 
 void game::update()
 {
+    auto frame_end = std::chrono::steady_clock::now();
+    std::chrono::duration<float> delta = frame_end - frame_start;
+    delta_time = delta.count();
+    frame_start = frame_end;
+
     uvec2 size = gfx_ctx->get_size();
     float aspect = size.x/float(size.y);
     ecs_scene([&](entity id, camera& cam){cam.set_aspect(aspect);});
+
+    viewer.pitch = clamp(viewer.pitch, -110.0f, 110.0f);
+    viewer.direction.x = clamp(viewer.direction.x, -0.5f, 0.5f);
+    viewer.direction.z = clamp(viewer.direction.z, -0.5f, 0.5f);
+    viewer.distance_steps = clamp(viewer.distance_steps, 0.0f, 10.0f);
 
     gbc->set_orientation(viewer.yaw, vec3(0,0,-1));
     gbc->rotate(viewer.pitch, vec3(1,0,0));
