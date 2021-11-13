@@ -429,19 +429,19 @@ void game::update_gbc_material()
     }
     else if(opt.gb_color == "teal")
     {
-        color = vec3(0.0, 0.128, 0.17);
+        color = vec3(0.0, 0.128, 0.17)*2.0f;
     }
     else if(opt.gb_color == "kiwi")
     {
-        color = vec3(0.15, 0.56, 0.0);
+        color = vec3(0.2, 0.56, 0.0)*0.5f;
     }
     else if(opt.gb_color == "berry")
     {
-        color = vec3(0.6, 0., 0.045);
+        color = vec3(0.6, 0., 0.045)*0.5f;
     }
     else if(opt.gb_color == "dandelion")
     {
-        color = vec3(0.7, 0.25, 0);
+        color = vec3(0.7, 0.4, 0)*0.5f;
     }
     else if(opt.gb_color == "atomic-purple")
     {

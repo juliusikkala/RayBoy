@@ -102,7 +102,7 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
         mr *= texture(textures[nonuniformEXT(spec.textures.y)], uv).bg;
     mat.metallic = mr.x;
     mat.roughness = mr.y;
-    mat.roughness2 = mr.y * mr.y;
+    mat.roughness2 = mat.roughness * mat.roughness;
 
     mat.ior_after = spec.metallic_roughness_normal_ior_factors.w;
     mat.ior_before = 1.0f;

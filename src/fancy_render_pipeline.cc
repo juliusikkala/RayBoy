@@ -104,7 +104,7 @@ void fancy_render_pipeline::reset()
         *ctx,
         color_target,
         resolve_target,
-        {0.5f, 0}
+        {1.0f, 0}
     ));
     if(render_resolution != ctx->get_size())
     {
