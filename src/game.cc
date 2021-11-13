@@ -102,7 +102,8 @@ void game::load_common_assets()
     console_data = load_gltf(
         *gfx_ctx,
         get_readonly_path("data/gbcv2_contraband_asset.glb"),
-        ecs_scene
+        ecs_scene,
+        true
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
     gbc->set_position(vec3(0, -0.1, 0));

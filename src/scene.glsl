@@ -79,6 +79,12 @@ layout(binding = 3) buffer camera_buffer
 
 layout(binding = 4) uniform sampler2D textures[];
 
+layout(binding = 5) uniform scene_params_buffer
+{
+    uint point_light_count;
+    uint directional_light_count;
+} scene_params;
+
 material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 {
     material mat;
@@ -95,7 +101,8 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
     if(spec.textures.y != -1)
         mr *= texture(textures[nonuniformEXT(spec.textures.y)], uv).bg;
     mat.metallic = mr.x;
-    mat.roughness = mr.y * mr.y;
+    mat.roughness = mr.y;
+    mat.roughness2 = mr.y * mr.y;
 
     mat.ior_after = spec.metallic_roughness_normal_ior_factors.w;
     mat.ior_before = 1.0f;
@@ -109,9 +116,9 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
             normalize(bitangent),
             normalize(normal)
         );
-        vec3 ts_normal = normalize(
-            texture(textures[nonuniformEXT(spec.textures.z)], uv).xyz * 2.0f - 1.0f
-        );
+        vec3 ts_normal =
+            texture(textures[nonuniformEXT(spec.textures.z)], uv).xyz * 2.0f - 1.0f;
+        ts_normal.xy *= spec.metallic_roughness_normal_ior_factors.z;
         mat.normal = normalize(tbn * ts_normal);
     }
     else mat.normal = normalize(normal);
@@ -130,6 +137,40 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
     mat.transmittance = mat.color.rgb * spec.emission_transmittance_factors.a;
 
     return mat;
+}
+
+void get_point_light_info(
+    point_light l,
+    vec3 pos,
+    out vec3 dir,
+    out vec3 color
+){
+    dir = l.pos_falloff.xyz - pos;
+    float dist2 = dot(dir, dir);
+    float dist = sqrt(dist2);
+    dir /= dist;
+
+    color = l.color_radius.rgb/dist2;
+
+    if(l.pos_falloff.w > 0)
+    {
+        float cutoff = dot(dir, -l.direction_cutoff.xyz);
+        cutoff = cutoff > l.direction_cutoff.w ?
+            1.0f-pow(
+                max(1.0f-cutoff, 0.0f)/(1.0f-l.direction_cutoff.w),
+                l.pos_falloff.w
+            ) : 0.0f;
+        color *= cutoff;
+    }
+}
+
+void get_directional_light_info(
+    directional_light l, 
+    out vec3 dir,
+    out vec3 color
+){
+    dir = -l.direction.xyz;
+    color = l.color.rgb;
 }
 
 #endif

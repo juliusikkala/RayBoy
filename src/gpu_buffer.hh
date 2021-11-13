@@ -24,10 +24,10 @@ public:
     VkBuffer operator[](uint32_t image_index) const;
 
     void update_ptr(uint32_t image_index, const void* data, size_t bytes = 0);
-    template<typename T, typename F>
-    void update(uint32_t image_index, F&& f);
     template<typename T>
     void update(uint32_t image_index, const T& t);
+    template<typename T, typename F>
+    void update(uint32_t image_index, F&& f);
     void upload(VkCommandBuffer cmd, uint32_t image_index);
 
 protected:

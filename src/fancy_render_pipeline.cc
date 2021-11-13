@@ -79,7 +79,8 @@ void fancy_render_pipeline::reset()
     tonemap_stage.reset(new tonemap_render_stage(
         *ctx,
         color_target,
-        resolve_target
+        resolve_target,
+        {0.1f, 0}
     ));
     if(render_resolution != ctx->get_size())
     {

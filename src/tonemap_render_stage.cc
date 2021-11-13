@@ -23,8 +23,9 @@ struct uniform_buffer
 tonemap_render_stage::tonemap_render_stage(
     context& ctx,
     render_target& src,
-    render_target& dst
-):  render_stage(ctx), tonemap_pipeline(ctx),
+    render_target& dst,
+    const options& opt
+):  render_stage(ctx), opt(opt), tonemap_pipeline(ctx),
     uniforms(ctx, sizeof(uniform_buffer)),
     stage_timer(ctx, "tonemap_render_stage")
 {
@@ -54,7 +55,7 @@ tonemap_render_stage::tonemap_render_stage(
         sizeof(push_constants)
     );
 
-    push_constants pc = {0, src.get_samples()};
+    push_constants pc = {opt.algorithm, src.get_samples()};
 
     // Assign parameters to the shader
     for(size_t i = 0; i < ctx.get_image_count(); ++i)
@@ -85,5 +86,5 @@ tonemap_render_stage::tonemap_render_stage(
 
 void tonemap_render_stage::update_buffers(uint32_t image_index)
 {
-    uniforms.update(image_index, uniform_buffer{1.0f, 1.0f/2.2f});
+    uniforms.update(image_index, uniform_buffer{opt.exposure, 1.0f/2.2f});
 }

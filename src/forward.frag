@@ -23,6 +23,29 @@ void main()
     instance i = instances.array[pc.instance_id];
     camera cam = cameras.array[pc.camera_id];
 
+    vec3 view_dir = normalize(cam.origin.xyz - position);
+
     material mat = sample_material(i.material, gl_FrontFacing, uv, normal, tangent, bitangent);
-    color = mat.color;
+
+    vec3 lighting = vec3(0);
+    for(uint i = 0; i < scene_params.point_light_count; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_point_light_info(point_lights.array[i], position, light_dir, color);
+        // Hack to prevent normal map weirdness at grazing angles
+        float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
+        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
+    }
+
+    for(uint i = 0; i < scene_params.directional_light_count; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_directional_light_info(directional_lights.array[i], light_dir, color);
+        float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
+        lighting += brdf(color, color, light_dir, view_dir, mat);
+    }
+
+    color = vec4(lighting, mat.color.a);
 }

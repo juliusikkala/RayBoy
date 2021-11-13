@@ -207,7 +207,7 @@ material create_material(
         model, md, mat.pbrMetallicRoughness.metallicRoughnessTexture.index
     );
 
-    m.normal_factor = 1.0f;
+    m.normal_factor = mat.normalTexture.scale;
     m.normal_texture = get_texture(model, md, mat.normalTexture.index);
 
     m.ior = 1.45f;
@@ -231,7 +231,8 @@ void load_gltf_node(
     int node_index,
     gltf_data& data,
     transformable* parent,
-    node_meta_info& meta
+    node_meta_info& meta,
+    bool mark_inner
 ){
     entity id = entities.add(transformable());
     tinygltf::Node& node = gltf_model.nodes[node_index];
@@ -318,17 +319,28 @@ void load_gltf_node(
         }
     }
 
+    if(mark_inner)
+    {
+        bool outer = node.extras.Has("outer_layer");
+        if(!outer) entities.attach(id, inner_node{});
+    }
+
     // Load child nodes
     for(int child_index: node.children)
         load_gltf_node(
-            entities, gltf_model, scene, child_index, data, tnode, meta
+            entities, gltf_model, scene, child_index, data, tnode, meta,
+            mark_inner
         );
 }
 
 }
 
-gltf_data load_gltf(context& ctx, const std::string& path, ecs& entities)
-{
+gltf_data load_gltf(
+    context& ctx,
+    const std::string& path,
+    ecs& entities,
+    bool mark_inner
+){
     gltf_data md;
 
     std::string err, warn;
@@ -595,7 +607,8 @@ gltf_data load_gltf(context& ctx, const std::string& path, ecs& entities)
     {
         for(int node_index: scene.nodes)
             load_gltf_node(
-                entities, gltf_model, scene, node_index, md, nullptr, meta
+                entities, gltf_model, scene, node_index, md, nullptr, meta,
+                mark_inner
             );
     }
 

@@ -28,6 +28,7 @@ public:
     void set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const;
 
     size_t get_instance_count() const;
+    bool is_instance_visible(size_t instance_id) const;
     void draw_instance(VkCommandBuffer buf, size_t instance_id) const;
 
 private:
@@ -40,6 +41,7 @@ private:
     gpu_buffer point_lights;
     gpu_buffer directional_lights;
     gpu_buffer cameras;
+    gpu_buffer scene_params;
     std::unordered_map<const mesh*, uint32_t> mesh_indices;
     std::unordered_map<material::sampler_tex, int32_t> st_pairs;
     std::vector<VkImageView> textures;
@@ -47,6 +49,7 @@ private:
     std::vector<VkBuffer> vertex_buffers;
     std::vector<VkBuffer> index_buffers;
     std::vector<const mesh*> instance_meshes;
+    std::vector<bool> instance_visible;
     texture filler_texture;
     sampler filler_sampler;
     vkres<VkBuffer> filler_buffer;

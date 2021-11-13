@@ -4,6 +4,7 @@
 #include "light.hh"
 #include "camera.hh"
 #include "helpers.hh"
+#include "gltf.hh"
 #include <cassert>
 
 namespace
@@ -55,6 +56,13 @@ struct gpu_directional_light
     vec4 direction;
 };
 
+struct gpu_scene_params
+{
+    uint32_t point_light_count;
+    uint32_t directional_light_count;
+};
+
+
 }
 
 scene::scene(context& ctx, ecs& e, size_t max_entries, size_t max_textures)
@@ -63,6 +71,7 @@ scene::scene(context& ctx, ecs& e, size_t max_entries, size_t max_textures)
     point_lights(ctx, max_entries*sizeof(gpu_point_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     directional_lights(ctx, max_entries*sizeof(gpu_directional_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     cameras(ctx, max_entries*sizeof(gpu_camera), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
+    scene_params(ctx, sizeof(gpu_scene_params), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     filler_texture(
         ctx, uvec2(1), VK_FORMAT_R8G8B8A8_UNORM, 0, nullptr,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -91,10 +100,14 @@ void scene::update(uint32_t image_index)
     vertex_buffers.clear();
     index_buffers.clear();
     instance_meshes.clear();
+    instance_visible.clear();
+ 
+    // Rayboy hack: inner parts of the console are marked as such, and won't
+    // be rasterized! They're only visible with ray tracing!
 
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
-        e->foreach([&](entity id, transformable& t, model& m) {
+        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner) {
             mat4 mat = t.get_global_transform();
             mat4 inv = inverseTranspose(mat);
             for(const model::vertex_group& group: m)
@@ -131,6 +144,7 @@ void scene::update(uint32_t image_index)
                     index_buffers.push_back(group.mesh->get_index_buffer());
                 }
                 instance_meshes.push_back(group.mesh);
+                instance_visible.push_back(inner == nullptr);
             }
         });
     });
@@ -140,6 +154,7 @@ void scene::update(uint32_t image_index)
     vertex_buffers.resize(max_entries, filler_buffer);
     index_buffers.resize(max_entries, filler_buffer);
 
+    gpu_scene_params params = {0, 0};
     point_lights.update<gpu_point_light>(image_index, [&](gpu_point_light* data){
         size_t i = 0;
         e->foreach([&](entity id, transformable& t, point_light& l) {
@@ -148,6 +163,7 @@ void scene::update(uint32_t image_index)
                 vec4(t.get_global_position(), 0),
                 vec4(t.get_global_direction(), 0)
             };
+            params.point_light_count++;
         });
         e->foreach([&](entity id, transformable& t, spotlight& l) {
             data[i++] = {
@@ -155,6 +171,7 @@ void scene::update(uint32_t image_index)
                 vec4(t.get_global_position(), l.get_falloff_exponent()),
                 vec4(t.get_global_direction(), cos(radians(l.get_cutoff_angle())))
             };
+            params.point_light_count++;
         });
     });
 
@@ -165,6 +182,7 @@ void scene::update(uint32_t image_index)
                 vec4(l.get_color(), 1),
                 vec4(t.get_global_direction(), cos(radians(l.get_radius())))
             };
+            params.directional_light_count++;
         });
     });
 
@@ -184,6 +202,7 @@ void scene::update(uint32_t image_index)
             };
         });
     });
+    scene_params.update(image_index, params);
 }
 
 void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
@@ -192,6 +211,7 @@ void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
     point_lights.upload(cmd, image_index);
     directional_lights.upload(cmd, image_index);
     cameras.upload(cmd, image_index);
+    scene_params.upload(cmd, image_index);
 }
 
 ecs& scene::get_ecs() const
@@ -212,10 +232,12 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // textures
         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
+        // Scene params
+        {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // vertex buffers
-        {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr},
+        {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr},
         // index buffers
-        {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
+        {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
     };
 }
 
@@ -227,13 +249,19 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
     pipeline.set_descriptor(image_index, 3, {cameras[image_index]});
 
     pipeline.set_descriptor(image_index, 4, textures, samplers);
-    pipeline.set_descriptor(image_index, 5, vertex_buffers);
-    pipeline.set_descriptor(image_index, 6, index_buffers);
+    pipeline.set_descriptor(image_index, 5, {scene_params[image_index]});
+    pipeline.set_descriptor(image_index, 6, vertex_buffers);
+    pipeline.set_descriptor(image_index, 7, index_buffers);
 }
 
 size_t scene::get_instance_count() const
 {
     return instance_meshes.size();
+}
+
+bool scene::is_instance_visible(size_t instance_id) const
+{
+    return instance_visible[instance_id];
 }
 
 void scene::draw_instance(VkCommandBuffer buf, size_t instance_id) const

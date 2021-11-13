@@ -57,9 +57,12 @@ forward_render_stage::forward_render_stage(
 
         for(size_t j = 0; j < s.get_instance_count(); ++j)
         {
-            pc.instance_id = j;
-            gfx.push_constants(buf, &pc);
-            s.draw_instance(buf, j);
+            if(s.is_instance_visible(j))
+            {
+                pc.instance_id = j;
+                gfx.push_constants(buf, &pc);
+                s.draw_instance(buf, j);
+            }
         }
 
         gfx.end_render_pass(buf);
