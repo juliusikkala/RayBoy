@@ -44,7 +44,7 @@ void main()
         vec3 color;
         get_directional_light_info(directional_lights.array[i], light_dir, color);
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        lighting += brdf(color, color, light_dir, view_dir, mat);
+        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
     }
 
     float alpha = 1.0f;

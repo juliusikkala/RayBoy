@@ -368,26 +368,26 @@ gltf_data load_gltf(
             switch(image.component)
             {
             case 1:
-                format = VK_FORMAT_R8_UNORM;
+                format = image.bits == 8 ? VK_FORMAT_R8_UNORM : VK_FORMAT_R16_UNORM;
                 break;
             case 2:
-                format = VK_FORMAT_R8G8_UNORM;
+                format = image.bits == 8 ? VK_FORMAT_R8G8_UNORM : VK_FORMAT_R16G16_UNORM;
                 break;
             default:
             case 3:
-                format = VK_FORMAT_R8G8B8_UNORM;
+                format = image.bits == 8 ? VK_FORMAT_R8G8B8_UNORM : VK_FORMAT_R16G16B16_UNORM;
                 break;
             case 4:
-                format = VK_FORMAT_R8G8B8A8_UNORM;
+                format = image.bits == 8 ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_R16G16B16A16_UNORM;
                 break;
             }
 
             flip_vector_image(image.image, image.height);
-            if(image.component == 3)
+            if(image.component == 3 && image.bits == 8)
             {
                 assert(image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE);
-                std::vector<uint8_t> new_image(image.image.size()/3*4);
-                uint8_t fill = 1.0;
+                std::vector<uint8_t> new_image(image.image.size()/3*4, 0);
+                uint8_t fill = 255;
                 interlace(
                     new_image.data(),
                     image.image.data(),

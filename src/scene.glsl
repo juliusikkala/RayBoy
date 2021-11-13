@@ -116,9 +116,7 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
             normalize(bitangent),
             normalize(normal)
         );
-        vec3 ts_normal =
-            texture(textures[nonuniformEXT(spec.textures.z)], uv).xyz * 2.0f - 1.0f;
-        ts_normal.z = max(ts_normal.z, 0.01);
+        vec3 ts_normal = texture(textures[nonuniformEXT(spec.textures.z)], uv).xyz * 2.0f - 1.0f;
         ts_normal.xy *= spec.metallic_roughness_normal_ior_factors.z;
         mat.normal = normalize(tbn * ts_normal);
     }
