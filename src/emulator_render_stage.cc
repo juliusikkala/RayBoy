@@ -1,6 +1,7 @@
 #include "emulator_render_stage.hh"
 #include "emulator_transform.comp.h"
 #include "io.hh"
+#include "helpers.hh"
 
 namespace
 {
@@ -19,7 +20,7 @@ emulator_render_stage::emulator_render_stage(
     context& ctx,
     emulator& emu,
     render_target& target,
-    bool generate_mipmaps,
+    bool do_generate_mipmaps,
     bool color_mapping,
     bool apply_gamma
 ):  render_stage(ctx), emu(&emu),
@@ -81,10 +82,28 @@ emulator_render_stage::emulator_render_stage(
         ivec2 size = target.get_size();
         vkCmdDispatch(cmd, (size.x+7)/8, (size.y+7)/8, 1);
 
-        target.transition_layout(cmd, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if(!do_generate_mipmaps)
+        {
+            target.transition_layout(cmd, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            stage_timer.stop(cmd, i);
+        }
 
-        stage_timer.stop(cmd, i);
         use_compute_commands(cmd, i);
+
+        if(do_generate_mipmaps)
+        {
+            VkCommandBuffer cmd = graphics_commands();
+            generate_mipmaps(
+                cmd,
+                target[i].image,
+                target.get_format(),
+                target.get_size(),
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            stage_timer.stop(cmd, i);
+            use_graphics_commands(cmd, i);
+        }
     }
 }
 

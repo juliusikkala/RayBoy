@@ -101,6 +101,7 @@ void scene::update(uint32_t image_index)
     index_buffers.clear();
     instance_meshes.clear();
     instance_visible.clear();
+    instance_material.clear();
  
     // Rayboy hack: inner parts of the console are marked as such, and won't
     // be rasterized! They're only visible with ray tracing!
@@ -145,6 +146,7 @@ void scene::update(uint32_t image_index)
                 }
                 instance_meshes.push_back(group.mesh);
                 instance_visible.push_back(inner == nullptr);
+                instance_material.push_back(&group.mat);
             }
         });
     });
@@ -262,6 +264,11 @@ size_t scene::get_instance_count() const
 bool scene::is_instance_visible(size_t instance_id) const
 {
     return instance_visible[instance_id];
+}
+
+const material* scene::get_instance_material(size_t instance_id) const
+{
+    return instance_material[instance_id];
 }
 
 void scene::draw_instance(VkCommandBuffer buf, size_t instance_id) const

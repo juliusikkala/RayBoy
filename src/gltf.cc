@@ -215,6 +215,11 @@ material create_material(
     m.emission_factor = vector_to_vec4(mat.emissiveFactor);
     m.emission_texture = get_texture(model, md, mat.emissiveTexture.index);
 
+    if(mat.extensions.count("KHR_materials_transmission"))
+    {
+        m.transmittance = mat.extensions["KHR_materials_transmission"].Get("transmissionFactor").Get<double>();
+    }
+
     return m;
 }
 

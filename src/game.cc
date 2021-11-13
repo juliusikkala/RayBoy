@@ -383,7 +383,9 @@ void game::create_pipeline()
         fancy_render_pipeline::options fancy_options = {
             opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
         };
-        pipeline.reset(new fancy_render_pipeline(*gfx_ctx, ecs_scene, fancy_options));
+        model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
+        material* screen_mat = &(*screen_model)[3].mat;
+        pipeline.reset(new fancy_render_pipeline(*gfx_ctx, ecs_scene, screen_mat, *emu, fancy_options));
         emu->set_audio_mode(
             ecs_scene.get<transformable>(console_data.entities["Speaker"])
         );

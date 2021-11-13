@@ -15,7 +15,7 @@ struct material
     vec3 transmittance;
 };
 
-vec3 fresnel_schlick(float cos_d, vec3 f0)
+float fresnel_schlick(float cos_d, float f0)
 {
     return f0 + (1.0f - f0) * pow(1.0f - cos_d, 5.0f);
 }
@@ -50,12 +50,10 @@ vec3 brdf(
     float cos_h = max(dot(mat.normal, h), 0.0f);
     float cos_d = clamp(dot(view_dir, h), 0.0f, 1.0f);
 
-    vec3 f0_m = mix(vec3(mat.f0), mat.color.rgb, mat.metallic);
-
     float k = mat.roughness2 + 1.0f;
     k = k * k * 0.125f;
 
-    vec3 fresnel = fresnel_schlick(cos_d, f0_m);
+    vec3 fresnel = mix(vec3(fresnel_schlick(cos_d, mat.f0)), mat.color.rgb, mat.metallic);
     float geometry = geometry_smith(cos_l, cos_v, k);
     float distribution = distribution_ggx(cos_h, mat.roughness2);
 
@@ -63,7 +61,7 @@ vec3 brdf(
 
     vec3 kd = (vec3(1.0f) - fresnel) * (1.0f - mat.metallic);
 
-    vec3 diffuse = kd * mat.color.rgb * diffuse_light_color;
+    vec3 diffuse = (1.0f - mat.transmittance) * kd * mat.color.rgb * diffuse_light_color;
 
     return (diffuse + specular) * cos_l;
 }

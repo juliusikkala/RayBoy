@@ -1,12 +1,32 @@
 #include "fancy_render_pipeline.hh"
+#define PIXEL_SCALE 16u
 
 fancy_render_pipeline::fancy_render_pipeline(
     context& ctx,
     ecs& entities,
+    material* screen_material,
+    emulator& emu,
     const options& opt
-): render_pipeline(ctx), entities(&entities), opt(opt)
+):  render_pipeline(ctx), entities(&entities), emu(&emu), opt(opt),
+    screen_material(screen_material),
+    gb_pixels(
+        ctx,
+        emu.get_screen_size()*PIXEL_SCALE,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        0, nullptr,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_STORAGE_BIT|
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    ),
+    gb_pixel_sampler(ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR)
 {
+    screen_material->color_texture = {&gb_pixel_sampler, &gb_pixels};
     reset();
+}
+
+fancy_render_pipeline::~fancy_render_pipeline()
+{
 }
 
 void fancy_render_pipeline::set_options(const options& opt)
@@ -68,6 +88,10 @@ void fancy_render_pipeline::reset()
     gui_stage.reset();
 
     // Initialize rendering stages
+    render_target gb_pixels_target = gb_pixels.get_render_target();
+    emulator_stage.reset(new emulator_render_stage(
+        *ctx, *emu, gb_pixels_target, true, true, false
+    ));
     scene_update_stage.reset(new scene_update_render_stage(*ctx, *entities));
     forward_stage.reset(new forward_render_stage(
         *ctx,
@@ -80,7 +104,7 @@ void fancy_render_pipeline::reset()
         *ctx,
         color_target,
         resolve_target,
-        {0.1f, 0}
+        {0.5f, 0}
     ));
     if(render_resolution != ctx->get_size())
     {
@@ -97,6 +121,7 @@ void fancy_render_pipeline::reset()
 
 VkSemaphore fancy_render_pipeline::render_stages(VkSemaphore semaphore, uint32_t image_index)
 {
+    semaphore = emulator_stage->run(image_index, semaphore);
     semaphore = scene_update_stage->run(image_index, semaphore);
     semaphore = forward_stage->run(image_index, semaphore);
     semaphore = tonemap_stage->run(image_index, semaphore);

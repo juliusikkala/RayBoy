@@ -165,8 +165,8 @@ void texture::load_from_data(size_t data_size, void* data)
     for(size_t i = 0; i < count; ++i)
     {
         images.emplace_back(create_gpu_image(
-            *ctx, size, format, layout, samples, tiling,
-            usage, data_size, data, data != nullptr
+            *ctx, size, format, layout, samples, tiling, usage, data_size, data,
+            (layout&VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         ));
         views.emplace_back(create_image_view(*ctx, images[i], format, deduce_image_aspect_flags(format)));
     }

@@ -7,6 +7,8 @@
 #include "forward_render_stage.hh"
 #include "tonemap_render_stage.hh"
 #include "gui_render_stage.hh"
+#include "emulator_render_stage.hh"
+#include "emulator.hh"
 
 class fancy_render_pipeline: public render_pipeline
 {
@@ -17,7 +19,14 @@ public:
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     };
 
-    fancy_render_pipeline(context& ctx, ecs& entities, const options& opt);
+    fancy_render_pipeline(
+        context& ctx,
+        ecs& entities,
+        material* screen_material,
+        emulator& emu,
+        const options& opt
+    );
+    ~fancy_render_pipeline();
 
     void set_options(const options& opt);
 
@@ -28,10 +37,15 @@ protected:
 
 private:
     ecs* entities;
+    emulator* emu;
     options opt;
+    material* screen_material;
     std::unique_ptr<texture> color_buffer;
     std::unique_ptr<texture> depth_buffer;
     std::unique_ptr<texture> resolve_buffer;
+    texture gb_pixels;
+    sampler gb_pixel_sampler;
+    std::unique_ptr<emulator_render_stage> emulator_stage;
     std::unique_ptr<scene_update_render_stage> scene_update_stage;
     std::unique_ptr<forward_render_stage> forward_stage;
     std::unique_ptr<tonemap_render_stage> tonemap_stage;

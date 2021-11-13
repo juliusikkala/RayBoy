@@ -57,8 +57,10 @@ forward_render_stage::forward_render_stage(
 
         for(size_t j = 0; j < s.get_instance_count(); ++j)
         {
-            if(s.is_instance_visible(j))
-            {
+            if(
+                s.is_instance_visible(j) &&
+                s.get_instance_material(j)->transmittance == 0.0f
+            ){
                 pc.instance_id = j;
                 gfx.push_constants(buf, &pc);
                 s.draw_instance(buf, j);

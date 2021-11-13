@@ -29,6 +29,7 @@ public:
 
     size_t get_instance_count() const;
     bool is_instance_visible(size_t instance_id) const;
+    const material* get_instance_material(size_t instance_id) const;
     void draw_instance(VkCommandBuffer buf, size_t instance_id) const;
 
 private:
@@ -50,6 +51,7 @@ private:
     std::vector<VkBuffer> index_buffers;
     std::vector<const mesh*> instance_meshes;
     std::vector<bool> instance_visible;
+    std::vector<const material*> instance_material;
     texture filler_texture;
     sampler filler_sampler;
     vkres<VkBuffer> filler_buffer;

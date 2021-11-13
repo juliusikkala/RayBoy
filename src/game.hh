@@ -53,7 +53,7 @@ private:
     struct
     {
         float pitch = 0, yaw = 0;
-        float sensitivity = 0.3;
+        float sensitivity = 0.1;
         float distance_steps = 0;
         vec3 direction = vec3(0);
     } viewer;
