@@ -33,8 +33,25 @@ forward_render_stage::forward_render_stage(
     if(color_target) targets.push_back(color_target);
     if(depth_target) targets.push_back(depth_target);
 
+    graphics_pipeline::params gfx_params(targets);
+
+    if(color_target)
+    {
+        gfx_params.blend_states[0] = {
+            VK_TRUE,
+            VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            VK_BLEND_OP_ADD,
+            VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ZERO,
+            VK_BLEND_OP_ADD,
+            VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|
+            VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
+        };
+    }
+
     gfx.init(
-        graphics_pipeline::params(targets),
+        gfx_params,
         sd,
         ctx.get_image_count(), 
         s.get_bindings(),
@@ -55,16 +72,29 @@ forward_render_stage::forward_render_stage(
         gfx.begin_render_pass(buf, i);
         gfx.bind(buf, i);
 
+        std::vector<size_t> transparents;
         for(size_t j = 0; j < s.get_instance_count(); ++j)
         {
-            if(
-                s.is_instance_visible(j) &&
-                s.get_instance_material(j)->transmittance == 0.0f
-            ){
-                pc.instance_id = j;
-                gfx.push_constants(buf, &pc);
-                s.draw_instance(buf, j);
+            if(s.is_instance_visible(j))
+            {
+                if(s.get_instance_material(j)->transmittance == 0.0f)
+                {
+                    pc.instance_id = j;
+                    gfx.push_constants(buf, &pc);
+                    s.draw_instance(buf, j);
+                }
+                else
+                {
+                    transparents.push_back(j);
+                }
             }
+        }
+
+        for(size_t j: transparents)
+        {
+            pc.instance_id = j;
+            gfx.push_constants(buf, &pc);
+            s.draw_instance(buf, j);
         }
 
         gfx.end_render_pass(buf);

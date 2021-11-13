@@ -48,7 +48,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         VK_FALSE,
         1.0f,
         nullptr,
-        VK_TRUE,
+        VK_FALSE,
         VK_FALSE
     };
 

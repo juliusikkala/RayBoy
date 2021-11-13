@@ -106,7 +106,6 @@ void game::load_common_assets()
         true
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
-    gbc->set_position(vec3(0, -0.1, 0));
     update_gbc_material();
 }
 
@@ -331,7 +330,7 @@ void game::update()
 
     gbc->set_orientation(viewer.yaw, vec3(0,0,-1));
     gbc->rotate(viewer.pitch, vec3(1,0,0));
-    float distance = 0.1 * pow(1.1, viewer.distance_steps);
+    float distance = 0.08 * pow(1.1, viewer.distance_steps);
     viewer.direction.y = -1;
     gbc->set_position(distance * viewer.direction);
 

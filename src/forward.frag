@@ -47,5 +47,14 @@ void main()
         lighting += brdf(color, color, light_dir, view_dir, mat);
     }
 
-    color = vec4(lighting, mat.color.a);
+    float alpha = 1.0f;
+
+    if(mat.transmittance.r > 0.0f)
+    {
+        float cos_d = clamp(dot(view_dir, normal), 0.0f, 1.0f);
+        float fresnel = fresnel_schlick(cos_d, mat.f0);
+        alpha = mix(1.0f, fresnel, mat.transmittance.r);
+    }
+
+    color = vec4(lighting, alpha);
 }
