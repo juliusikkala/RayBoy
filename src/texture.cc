@@ -1,6 +1,9 @@
 #include "texture.hh"
 #include "helpers.hh"
 #include "stb_image.h"
+#include "ktxvulkan.h"
+#include "io.hh"
+#include "error.hh"
 
 texture::texture(context& ctx, const std::string& path, VkImageLayout layout)
 : ctx(&ctx), layout(layout)
@@ -18,8 +21,8 @@ texture::texture(
     VkImageUsageFlags usage,
     VkImageLayout layout,
     VkSampleCountFlagBits samples
-):  ctx(&ctx), size(size), format(format), tiling(tiling), usage(usage),
-    layout(layout), samples(samples), opaque(false)
+):  ctx(&ctx), dim(size, 1), format(format), tiling(tiling),
+    usage(usage), layout(layout), samples(samples), opaque(false)
 {
     load_from_data(data_size, data);
 }
@@ -36,7 +39,10 @@ VkImage texture::get_image(uint32_t image_index) const
 
 render_target texture::get_render_target() const
 {
-    assert((usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0);
+    check_error(
+        (usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) == 0,
+        "Cannot get render target for this texture due to incorrect usage flags!"
+    );
 
     std::vector<render_target::frame> frames(images.size());
 
@@ -45,7 +51,7 @@ render_target texture::get_render_target() const
 
     return render_target(
         frames,
-        size,
+        dim,
         samples,
         format
     );
@@ -71,29 +77,87 @@ bool texture::potentially_transparent() const
     }
 }
 
-uvec2 texture::get_size() const { return size; }
+uvec2 texture::get_size() const { return dim; }
+uvec3 texture::get_dim() const { return dim; }
 
 void texture::load_from_file(const std::string& path)
+{
+    fs::path p(path);
+    if(p.extension() == ".ktx")
+    {
+        load_from_ktx(path);
+    }
+    else load_from_stb(path);
+}
+
+void texture::load_from_ktx(const std::string& path)
+{
+    ktxTexture* kTexture;
+    KTX_error_code result;
+    ktxVulkanDeviceInfo vdi;
+    ktxVulkanTexture texture;
+
+    const device& dev = ctx->get_device();
+
+    ktxVulkanDeviceInfo_Construct(
+        &vdi, dev.physical_device, dev.logical_device, dev.graphics_queue,
+        dev.graphics_pool, nullptr
+    );
+
+    result = ktxTexture_CreateFromNamedFile(
+        path.c_str(),
+        KTX_TEXTURE_CREATE_NO_FLAGS,
+        &kTexture
+    );
+    check_error(result != KTX_SUCCESS, "Failed to load image %s", path.c_str());
+
+    tiling = VK_IMAGE_TILING_OPTIMAL;
+    usage = VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT;
+    result = ktxTexture_VkUploadEx(
+        kTexture, &vdi, &texture, tiling, usage, layout
+    );
+    check_error(
+        result != KTX_SUCCESS,
+        "Failed to load image %s to Vulkan",
+        path.c_str()
+    );
+
+    ktxTexture_Destroy(kTexture);
+    ktxVulkanDeviceInfo_Destruct(&vdi);
+
+    format = texture.imageFormat;
+    samples = VK_SAMPLE_COUNT_1_BIT;
+    opaque = true; // TODO
+    dim = uvec3(texture.width, texture.height, texture.depth);
+
+    images.emplace_back(*ctx, texture.image, texture.deviceMemory);
+    views.emplace_back(create_image_view(
+        *ctx, images[0], format, VK_IMAGE_ASPECT_COLOR_BIT, texture.viewType
+    ));
+}
+
+void texture::load_from_stb(const std::string& path)
 {
     bool hdr = stbi_is_hdr(path.c_str());
     void* data = nullptr;
     size_t data_size = 0;
     int channels = 0;
+    dim.z = 1;
     if(hdr)
     {
         data = stbi_loadf(
-            path.c_str(), (int*)&size.x, (int*)&size.y, &channels, 0
+            path.c_str(), (int*)&dim.x, (int*)&dim.y, &channels, 0
         );
-        data_size = size.x * size.y * channels * sizeof(float);
+        data_size = dim.x * dim.y * channels * sizeof(float);
     }
     else
     {
         data = stbi_load(
-            path.c_str(), (int*)&size.x, (int*)&size.y, &channels, 0
+            path.c_str(), (int*)&dim.x, (int*)&dim.y, &channels, 0
         );
-        data_size = size.x * size.y * channels * sizeof(uint8_t);
+        data_size = dim.x * dim.y * channels * sizeof(uint8_t);
     }
-    assert(data && "Failed to load image");
+    check_error(!data, "Failed to load image %s", path.c_str());
     opaque = channels < 4;
 
     // Vulkan implementations don't really support 3-channel textures...
@@ -101,20 +165,20 @@ void texture::load_from_file(const std::string& path)
     {
         if(hdr)
         {
-            size_t new_data_size = size.x * size.y * 4 * sizeof(float);
+            size_t new_data_size = dim.x * dim.y * 4 * sizeof(float);
             float* new_data = (float*)malloc(new_data_size);
             float fill = 1.0;
-            interlace(new_data, data, &fill, 3 * sizeof(float), 4 * sizeof(float), size.x*size.y);
+            interlace(new_data, data, &fill, 3 * sizeof(float), 4 * sizeof(float), dim.x*dim.y);
             free(data);
             data = new_data;
             data_size = new_data_size;
         }
         else
         {
-            size_t new_data_size = size.x * size.y * 4 * sizeof(uint8_t);
+            size_t new_data_size = dim.x * dim.y * 4 * sizeof(uint8_t);
             uint8_t* new_data = (uint8_t*)malloc(new_data_size);
             uint8_t fill = 255;
-            interlace(new_data, data, &fill, 3 * sizeof(uint8_t), 4 * sizeof(uint8_t), size.x*size.y);
+            interlace(new_data, data, &fill, 3 * sizeof(uint8_t), 4 * sizeof(uint8_t), dim.x*dim.y);
             free(data);
             data = new_data;
             data_size = new_data_size;
@@ -146,7 +210,7 @@ void texture::load_from_file(const std::string& path)
     samples = VK_SAMPLE_COUNT_1_BIT;
 
     images.emplace_back(create_gpu_image(
-        *ctx, size, format, layout, samples,
+        *ctx, uvec2(dim), format, layout, samples,
         tiling, usage, data_size, data, true
     ));
 
@@ -165,7 +229,7 @@ void texture::load_from_data(size_t data_size, void* data)
     for(size_t i = 0; i < count; ++i)
     {
         images.emplace_back(create_gpu_image(
-            *ctx, size, format, layout, samples, tiling, usage, data_size, data,
+            *ctx, dim, format, layout, samples, tiling, usage, data_size, data,
             (layout&VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         ));
         views.emplace_back(create_image_view(*ctx, images[i], format, deduce_image_aspect_flags(format)));

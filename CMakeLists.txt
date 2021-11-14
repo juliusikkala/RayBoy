@@ -19,6 +19,14 @@ if (NOT Vulkan_FOUND)
     add_subdirectory(external/Vulkan-Loader)
 endif()
 
+set(KTX_FEATURE_GL_UPLOAD OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_DOC OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TOOLS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TESTS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_LOADTEST_APPS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_STATIC_LIBRARY ON CACHE BOOL "" FORCE)
+add_subdirectory(external/KTX-Software)
+
 set(shader_src
     src/xor.comp
     src/forward.vert
@@ -56,6 +64,8 @@ elseif(UNIX AND NOT APPLE)
 elseif(APPLE)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_MACOS_MVK)
 endif()
+set(VOLK_STATIC_DEFINES ${VOLK_STATIC_DEFINES} VOLK_VULKAN_H_PATH="../Vulkan-Headers/include/vulkan/vulkan.h")
+set(VOLK_PULL_IN_VULKAN OFF)
 add_subdirectory(external/volk)
 
 set(SAMEBOY_CORE_SRC
@@ -149,6 +159,7 @@ add_executable(rayboy
     src/emulator_render_stage.cc
     src/audio.cc
     src/game.cc
+    src/error.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -160,24 +171,26 @@ target_include_directories(rayboy PUBLIC
     "external/SameBoy/Core"
     "external/volk"
     "external/imgui"
+    "external/KTX-Software/include"
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_compile_features(rayboy PUBLIC cxx_std_17)
-if (SDL2_FOUND)
-    target_link_libraries(rayboy PUBLIC SDL2::SDL2)
-else()
-    target_link_libraries(rayboy PUBLIC SDL2)
-endif()
 if (Vulkan_FOUND)
     target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
 else()
     target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
     target_link_libraries(rayboy PUBLIC vulkan)
 endif()
+if (SDL2_FOUND)
+    target_link_libraries(rayboy PUBLIC SDL2::SDL2)
+else()
+    target_link_libraries(rayboy PUBLIC SDL2)
+endif()
 target_link_libraries(rayboy PUBLIC soloud)
 target_link_libraries(rayboy PUBLIC Threads::Threads)
 target_link_libraries(rayboy PRIVATE volk)
 target_link_libraries(rayboy PRIVATE SameBoy)
+target_link_libraries(rayboy PUBLIC ktx)
 
 if (WIN32)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/nfd.lib)

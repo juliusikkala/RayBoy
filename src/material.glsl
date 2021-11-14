@@ -66,7 +66,8 @@ vec3 brdf(
     return (diffuse + specular) * cos_l;
 }
 
-/*
+layout(binding = 9) uniform sampler2D brdf_integration;
+
 // https://seblagarde.wordpress.com/2011/08/17/hello-world/
 vec3 fresnel_schlick_attenuated(float cos_d, vec3 f0, float roughness)
 {
@@ -99,6 +100,5 @@ vec3 brdf_indirect(
 
     return diffuse + specular;
 }
-*/
 
 #endif

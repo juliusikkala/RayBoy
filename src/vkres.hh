@@ -82,6 +82,7 @@ class vkres<VkImage>
 public:
     vkres();
     vkres(context& ctx, VkImage img = VK_NULL_HANDLE, VmaAllocation alloc = VK_NULL_HANDLE);
+    vkres(context& ctx, VkImage img, VkDeviceMemory memory);
     vkres(vkres<VkImage>& other) = delete;
     vkres(vkres<VkImage>&& other);
     ~vkres();
@@ -95,6 +96,7 @@ public:
 private:
     VkImage image;
     VmaAllocation allocation;
+    VkDeviceMemory memory;
     context* ctx;
 };
 

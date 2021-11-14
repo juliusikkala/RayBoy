@@ -36,14 +36,17 @@ public:
     bool potentially_transparent() const;
 
     uvec2 get_size() const;
+    uvec3 get_dim() const;
 
 private:
     void load_from_file(const std::string& path);
+    void load_from_ktx(const std::string& path);
+    void load_from_stb(const std::string& path);
     void load_from_data(size_t data_size, void* data);
 
     context* ctx;
 
-    uvec2 size;
+    uvec3 dim;
     std::vector<vkres<VkImage>> images;
     std::vector<vkres<VkImageView>> views;
     VkFormat format;

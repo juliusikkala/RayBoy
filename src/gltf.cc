@@ -1,6 +1,7 @@
 #include "gltf.hh"
 #include "tiny_gltf.h"
 #include "helpers.hh"
+#include "error.hh"
 #include "stb_image.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
@@ -310,13 +311,13 @@ void load_gltf_node(
         // https://github.com/KhronosGroup/glTF-Blender-IO/issues/564
         vec3 color(vector_to_vec4(l.color) * (float)l.intensity);
         if(l.type == "directional")
-            entities.attach(id, directional_light(color*0.3333333f));
+            entities.attach(id, directional_light(color));
         else if(l.type == "point")
-            entities.attach(id, point_light(color*0.3333333f));
+            entities.attach(id, point_light(color*float(0.25/M_PI)));
         else if(l.type == "spot")
         {
             spotlight sl(
-                color*0.3333333f,
+                color*float(0.25/M_PI),
                 glm::degrees(l.spot.outerConeAngle)
             );
             sl.set_inner_angle(glm::degrees(l.spot.innerConeAngle), 4/255.0f);
@@ -385,7 +386,10 @@ gltf_data load_gltf(
             flip_vector_image(image.image, image.height);
             if(image.component == 3 && image.bits == 8)
             {
-                assert(image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE);
+                check_error(
+                    image.pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE,
+                    "16-bit channel interlacing not implemented yet"
+                );
                 std::vector<uint8_t> new_image(image.image.size()/3*4, 0);
                 uint8_t fill = 255;
                 interlace(

@@ -4,7 +4,8 @@ vkres<VkImageView> create_image_view(
     context& ctx,
     VkImage image,
     VkFormat format,
-    VkImageAspectFlags aspect
+    VkImageAspectFlags aspect,
+    VkImageViewType type
 ){
     VkImageView view;
     VkImageViewCreateInfo view_info = {
@@ -12,11 +13,11 @@ vkres<VkImageView> create_image_view(
         nullptr,
         {},
         image,
-        VK_IMAGE_VIEW_TYPE_2D,
+        type,
         format,
         {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
          VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
-        {aspect, 0, VK_REMAINING_MIP_LEVELS, 0, 1}
+        {aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS}
     };
     vkCreateImageView(ctx.get_device().logical_device, &view_info, nullptr, &view);
     return {ctx, view};

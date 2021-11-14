@@ -1,4 +1,5 @@
 #include "forward_render_stage.hh"
+#include "io.hh"
 #include "forward.frag.h"
 #include "forward.vert.h"
 
@@ -19,7 +20,13 @@ forward_render_stage::forward_render_stage(
     render_target* depth_target,
     const scene& s,
     entity cam_id
-): render_stage(ctx), gfx(ctx), stage_timer(ctx, "forward_render_stage")
+):  render_stage(ctx), gfx(ctx), stage_timer(ctx, "forward_render_stage"),
+    cam_id(cam_id), brdf_integration(ctx, get_readonly_path("data/brdf_integration.ktx")),
+    brdf_integration_sampler(
+        ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+        VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1, 0, 0
+    )
 {
     shader_data sd;
 
@@ -49,12 +56,14 @@ forward_render_stage::forward_render_stage(
             VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
         };
     }
+    std::vector<VkDescriptorSetLayoutBinding> bindings = s.get_bindings();
+    bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
     gfx.init(
         gfx_params,
         sd,
         ctx.get_image_count(), 
-        s.get_bindings(),
+        bindings,
         sizeof(push_constants)
     );
 
@@ -64,6 +73,7 @@ forward_render_stage::forward_render_stage(
     {
         // Assign descriptors
         s.set_descriptors(gfx, i);
+        gfx.set_descriptor(i, 9, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
 
         // Record command buffer
         VkCommandBuffer buf = graphics_commands();

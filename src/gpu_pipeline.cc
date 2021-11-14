@@ -1,6 +1,6 @@
 #include "gpu_pipeline.hh"
 #include "helpers.hh"
-#include <cassert>
+#include "error.hh"
 
 gpu_pipeline::gpu_pipeline(context& ctx)
 : ctx(&ctx)
@@ -88,7 +88,10 @@ void gpu_pipeline::set_descriptor(
     VkDescriptorSetLayoutBinding bind = find_binding(binding_index);
     std::vector<VkDescriptorImageInfo> image_infos(bind.descriptorCount);
 
-    assert(views.size() == bind.descriptorCount);
+    check_error(
+        views.size() != bind.descriptorCount,
+        "Image view count does not match descriptor count"
+    );
 
     for(size_t i = 0; i < bind.descriptorCount; ++i)
     {
@@ -153,5 +156,5 @@ VkDescriptorSetLayoutBinding gpu_pipeline::find_binding(size_t binding_index) co
             return bind;
         }
     }
-    assert(false && "Missing binding index");
+    panic("Missing binding index %lu", binding_index);
 }

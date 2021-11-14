@@ -1,6 +1,5 @@
 #include "render_stage.hh"
 #include "helpers.hh"
-#include <cassert>
 
 render_stage::render_stage(context& ctx)
 : ctx(&ctx), first_frame(true)

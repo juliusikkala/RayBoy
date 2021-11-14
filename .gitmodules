@@ -28,3 +28,6 @@
 [submodule "external/soloud"]
 	path = external/soloud
 	url = https://github.com/jarikomppa/soloud.git
+[submodule "external/KTX-Software"]
+	path = external/KTX-Software
+	url = https://github.com/KhronosGroup/KTX-Software.git

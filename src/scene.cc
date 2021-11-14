@@ -5,7 +5,7 @@
 #include "camera.hh"
 #include "helpers.hh"
 #include "gltf.hh"
-#include <cassert>
+#include "error.hh"
 
 namespace
 {
@@ -88,9 +88,10 @@ void scene::update(uint32_t image_index)
 {
     size_t instance_count = 0;
     e->foreach([&](entity id, model& m) { instance_count += m.group_count(); });
-    assert(
+    check_error(
         instance_count + e->count<point_light>() +
-        e->count<spotlight>() + e->count<directional_light>() <= max_entries
+        e->count<spotlight>() + e->count<directional_light>() > max_entries,
+        "Too many entities in scene!"
     );
 
     mesh_indices.clear();

@@ -205,12 +205,18 @@ VmaAllocation vkres<VkBuffer>::get_allocation() const
 }
 
 vkres<VkImage>::vkres()
-: image(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE), ctx(nullptr)
+:   image(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE), memory(VK_NULL_HANDLE),
+    ctx(nullptr)
 {
 }
 
 vkres<VkImage>::vkres(context& ctx, VkImage img, VmaAllocation alloc)
-: image(img), allocation(alloc), ctx(&ctx)
+:   image(img), allocation(alloc), memory(VK_NULL_HANDLE), ctx(&ctx)
+{
+}
+
+vkres<VkImage>::vkres(context& ctx, VkImage img, VkDeviceMemory memory)
+:   image(img), allocation(VK_NULL_HANDLE), memory(memory), ctx(&ctx)
 {
 }
 
@@ -232,12 +238,15 @@ void vkres<VkImage>::reset(VkImage img, VmaAllocation alloc)
         ctx->at_frame_finish([
             image=this->image,
             allocation=this->allocation,
+            memory=this->memory,
             logical_device=dev.logical_device,
             allocator=dev.allocator
         ](){
             vkDestroyImage(logical_device, image, nullptr);
             if(allocation != VK_NULL_HANDLE)
                 vmaFreeMemory(allocator, allocation);
+            if(memory != VK_NULL_HANDLE)
+                vkFreeMemory(logical_device, memory, nullptr);
         });
     }
     image = img;
@@ -248,9 +257,11 @@ void vkres<VkImage>::operator=(vkres<VkImage>&& other)
 {
     this->image = other.image;
     this->allocation = other.allocation;
+    this->memory = other.memory;
     this->ctx = other.ctx;
     other.image = VK_NULL_HANDLE;
-    other.image = VK_NULL_HANDLE;
+    other.allocation = VK_NULL_HANDLE;
+    other.memory = VK_NULL_HANDLE;
 }
 
 const VkImage& vkres<VkImage>::operator*() const

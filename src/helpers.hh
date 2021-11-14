@@ -8,7 +8,8 @@ vkres<VkImageView> create_image_view(
     context& ctx,
     VkImage image,
     VkFormat format,
-    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+    VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D
 );
 
 vkres<VkDescriptorSetLayout> create_descriptor_set_layout(
