@@ -31,6 +31,7 @@ vkres<VkImage> create_gpu_image(
     VkSampleCountFlagBits samples,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
+    VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D,
     size_t bytes = 0,
     void* data = nullptr,
     bool mipmapped = false

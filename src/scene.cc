@@ -4,6 +4,7 @@
 #include "light.hh"
 #include "camera.hh"
 #include "helpers.hh"
+#include "environment_map.hh"
 #include "gltf.hh"
 #include "error.hh"
 
@@ -27,8 +28,8 @@ struct gpu_instance
     mat4 model_to_world;
     mat4 normal_to_world;
     gpu_material material;
-    uint32_t mesh;
-    uint32_t pad[3];
+    // x = radiance index, y = irradiance index, z = lightmap index, w = mesh index
+    ivec4 environment_mesh;
 };
 
 struct gpu_camera
@@ -77,7 +78,16 @@ scene::scene(context& ctx, ecs& e, size_t max_entries, size_t max_textures)
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     ),
+    filler_cubemap(
+        ctx, uvec2(1), VK_FORMAT_R8G8B8A8_UNORM, 0, nullptr,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_VIEW_TYPE_CUBE
+    ),
     filler_sampler(ctx),
+    radiance_sampler(ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 1),
+    irradiance_sampler(ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 1, 0.0f, 0.0f),
     filler_buffer(create_gpu_buffer(ctx, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT))
 {
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
@@ -96,16 +106,24 @@ void scene::update(uint32_t image_index)
 
     mesh_indices.clear();
     st_pairs.clear();
+    envmap_indices.clear();
     textures.clear();
     samplers.clear();
+    cubemap_textures.clear();
+    cubemap_samplers.clear();
     vertex_buffers.clear();
     index_buffers.clear();
     instance_meshes.clear();
     instance_visible.clear();
     instance_material.clear();
  
-    // Rayboy hack: inner parts of the console are marked as such, and won't
-    // be rasterized! They're only visible with ray tracing!
+    e->foreach([&](entity id, environment_map& e) {
+        envmap_indices[&e] = cubemap_textures.size();
+        cubemap_textures.push_back(e.get_radiance()->get_image_view(image_index));
+        cubemap_textures.push_back(e.get_irradiance()->get_image_view(image_index));
+        cubemap_samplers.push_back(radiance_sampler.get());
+        cubemap_samplers.push_back(irradiance_sampler.get());
+    });
 
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
@@ -134,18 +152,28 @@ void scene::update(uint32_t image_index)
                     get_st_index(group.mat.normal_texture, image_index),
                     get_st_index(group.mat.emission_texture, image_index),
                 };
+                inst.environment_mesh = ivec4(-1);
+                auto eit = envmap_indices.find(group.mat.envmap);
+                if(eit != envmap_indices.end())
+                {
+                    inst.environment_mesh.x = eit->second;
+                    inst.environment_mesh.y = eit->second+1;
+                }
 
                 auto mesh_it = mesh_indices.find(group.mesh);
                 if(mesh_it != mesh_indices.end())
-                    inst.mesh = mesh_it->second;
+                    inst.environment_mesh.w = mesh_it->second;
                 else
                 {
-                    inst.mesh = mesh_indices.size();
-                    mesh_indices[group.mesh] = inst.mesh;
+                    inst.environment_mesh.w = mesh_indices.size();
+                    mesh_indices[group.mesh] = inst.environment_mesh.w;
                     vertex_buffers.push_back(group.mesh->get_vertex_buffer());
                     index_buffers.push_back(group.mesh->get_index_buffer());
                 }
                 instance_meshes.push_back(group.mesh);
+                // Rayboy hack: inner parts of the console are marked as such,
+                // and won't be rasterized! They're only visible with ray
+                // tracing!
                 instance_visible.push_back(inner == nullptr);
                 instance_material.push_back(&group.mat);
             }
@@ -154,6 +182,8 @@ void scene::update(uint32_t image_index)
 
     textures.resize(max_textures, filler_texture.get_image_view(image_index));
     samplers.resize(max_textures, filler_sampler.get());
+    cubemap_textures.resize(max_textures, filler_cubemap.get_image_view(image_index));
+    cubemap_samplers.resize(max_textures, filler_sampler.get());
     vertex_buffers.resize(max_entries, filler_buffer);
     index_buffers.resize(max_entries, filler_buffer);
 
@@ -235,12 +265,14 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // textures
         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
+        // Cubemap textures
+        {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
         // Scene params
-        {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // vertex buffers
-        {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr},
+        {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr},
         // index buffers
-        {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
+        {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
     };
 }
 
@@ -252,9 +284,10 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
     pipeline.set_descriptor(image_index, 3, {cameras[image_index]});
 
     pipeline.set_descriptor(image_index, 4, textures, samplers);
-    pipeline.set_descriptor(image_index, 5, {scene_params[image_index]});
-    pipeline.set_descriptor(image_index, 6, vertex_buffers);
-    pipeline.set_descriptor(image_index, 7, index_buffers);
+    pipeline.set_descriptor(image_index, 5, cubemap_textures, cubemap_samplers);
+    pipeline.set_descriptor(image_index, 6, {scene_params[image_index]});
+    pipeline.set_descriptor(image_index, 7, vertex_buffers);
+    pipeline.set_descriptor(image_index, 8, index_buffers);
 }
 
 size_t scene::get_instance_count() const

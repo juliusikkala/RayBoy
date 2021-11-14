@@ -4,6 +4,7 @@
 
 class texture;
 class sampler;
+class environment_map;
 
 struct material
 {
@@ -27,6 +28,8 @@ struct material
 
     // Implements multiplicative transparency.
     float transmittance = 0.0f;
+
+    const environment_map* envmap = nullptr;
 };
 
 namespace std

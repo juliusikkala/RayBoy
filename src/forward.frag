@@ -27,7 +27,27 @@ void main()
 
     material mat = sample_material(i.material, gl_FrontFacing, uv, normal, tangent, bitangent);
 
-    vec3 lighting = vec3(0);
+    vec3 indirect_diffuse;
+    vec3 indirect_specular;
+
+    get_indirect_light(
+        position,
+        i.environment_mesh.xyz,
+        mat.normal,
+        view_dir,
+        mat.roughness,
+        vec2(0), // TODO: Lightmaps
+        indirect_diffuse,
+        indirect_specular
+    );
+
+    vec3 lighting = brdf_indirect(
+        indirect_diffuse,
+        indirect_specular,
+        view_dir,
+        mat
+    ) + mat.emission;
+
     for(uint i = 0; i < scene_params.point_light_count; ++i)
     {
         vec3 light_dir;

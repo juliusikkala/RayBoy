@@ -93,9 +93,9 @@ vec3 brdf_indirect(
     );
 
     vec3 kd = (vec3(1.0f) - fresnel) * (1.0f - mat.metallic);
-    vec3 diffuse = kd * mat.color.rgb * incoming_diffuse;
+    vec3 diffuse = kd * mat.color.rgb * incoming_diffuse * (1.0f - mat.transmittance);
 
-    vec2 bi = texture(brdf_integration, vec2(cos_v, mat.roughness)).xy;
+    vec2 bi = texture(brdf_integration, vec2(cos_v, 1.0-mat.roughness)).xy;
     vec3 specular = incoming_specular * (fresnel * bi.x + bi.y);
 
     return diffuse + specular;

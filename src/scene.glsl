@@ -20,8 +20,8 @@ struct instance
     mat4 model_to_world;
     mat4 normal_to_world;
     material_spec material;
-    uint mesh;
-    uint pad[3];
+    // x = radiance index, y = irradiance index, z = lightmap index, w = mesh_index
+    ivec4 environment_mesh;
 };
 
 struct camera
@@ -79,7 +79,9 @@ layout(binding = 3) buffer camera_buffer
 
 layout(binding = 4) uniform sampler2D textures[];
 
-layout(binding = 5) uniform scene_params_buffer
+layout(binding = 5) uniform samplerCube cube_textures[];
+
+layout(binding = 6) uniform scene_params_buffer
 {
     uint point_light_count;
     uint directional_light_count;
@@ -89,7 +91,6 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
 {
     material mat;
     mat.color = spec.color_factor;
-    mat.color.rgb = inverse_srgb_correction(mat.color.rgb);
     if(spec.textures.x != -1)
     {
         vec4 tex_col = texture(textures[nonuniformEXT(spec.textures.x)], uv);
@@ -170,6 +171,41 @@ void get_directional_light_info(
 ){
     dir = -l.direction.xyz;
     color = l.color.rgb;
+}
+
+void get_indirect_light(
+    vec3 pos,
+    ivec3 environment_indices,
+    vec3 normal,
+    vec3 view,
+    float roughness,
+    vec2 lightmap_uv,
+    out vec3 indirect_diffuse,
+    out vec3 indirect_specular
+){
+    indirect_diffuse = vec3(0);
+    indirect_specular = vec3(0);
+
+    if(environment_indices.x != -1)
+    {
+        // Instead of reflect(), we use a clamped version of the same calculation to
+        // reduce shimmering edge artefacts.
+        vec3 ref_dir = 2.0f * max(
+            dot(normal, view), 0.0f
+        ) * normal - view;
+
+        float lod = roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
+        indirect_specular = textureLod(cube_textures[nonuniformEXT(environment_indices.x)], ref_dir, lod).rgb;
+    }
+
+    if(environment_indices.y != -1)
+        indirect_diffuse = texture(cube_textures[nonuniformEXT(environment_indices.y)], normal).rgb;
+
+    if(environment_indices.z != -1)
+        indirect_diffuse = texture(
+            textures[nonuniformEXT(environment_indices.z)],
+            lightmap_uv
+        ).rgb;
 }
 
 #endif

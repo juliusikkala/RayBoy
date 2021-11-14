@@ -1,9 +1,12 @@
 #include "game.hh"
+#include "environment_map.hh"
 #include "imgui.h"
 #define AUTOSAVE_INTERVAL (60*1000)
 
 namespace
 {
+
+struct console_entity {};
 
 float deadzone(float value, float dz)
 {
@@ -107,6 +110,10 @@ void game::load_common_assets()
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
     update_gbc_material();
+    for(const auto& [name, id]: console_data.entities)
+    {
+        ecs_scene.attach(id, console_entity{});
+    }
 }
 
 void game::load_scene(const std::string& name)
@@ -123,6 +130,21 @@ void game::load_scene(const std::string& name)
         get_readonly_path("data/"+name+".glb"),
         ecs_scene
     );
+
+    scene_data.textures.emplace_back(new texture(*gfx_ctx, get_readonly_path("data/"+name+"_radiance.ktx")));
+    scene_data.textures.emplace_back(new texture(*gfx_ctx, get_readonly_path("data/"+name+"_irradiance.ktx")));
+    entity envmap_id = ecs_scene.add(environment_map{
+        scene_data.textures[scene_data.textures.size()-2].get(),
+        scene_data.textures[scene_data.textures.size()-1].get()
+    });
+    scene_data.entities["ENVMAP"] = envmap_id;
+    environment_map* envmap = ecs_scene.get<environment_map>(envmap_id);
+    // Use the scene envmap for the console (and only the console, as the scene
+    // itself should be lightmapped instead.)
+    ecs_scene([&](entity id, console_entity&, model& m){
+        for(auto& vg: m)
+            vg.mat.envmap = envmap;
+    });
 
     cam_transform = ecs_scene.get<transformable>(scene_data.entities["Camera"]);
     cam = ecs_scene.get<camera>(scene_data.entities["Camera_Orientation"]);
@@ -418,6 +440,7 @@ void game::update_gbc_material()
     model* battery_cover = ecs_scene.get<model>(console_data.entities["Battery cover"]);
     model* back_panel = ecs_scene.get<model>(console_data.entities["Back panel"]);
     model* front_panel = ecs_scene.get<model>(console_data.entities["Front panel"]);
+    model* led = ecs_scene.get<model>(console_data.entities["Red LED"]);
 
     vec3 color = vec3(0);
     float metallic = 0.0f;
@@ -429,7 +452,7 @@ void game::update_gbc_material()
     }
     else if(opt.gb_color == "teal")
     {
-        color = vec3(0.0, 0.128, 0.17)*2.0f;
+        color = vec3(0.0, 0.128, 0.17);
     }
     else if(opt.gb_color == "kiwi")
     {

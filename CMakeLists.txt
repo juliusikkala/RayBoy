@@ -160,6 +160,7 @@ add_executable(rayboy
     src/audio.cc
     src/game.cc
     src/error.cc
+    src/environment_map.cc
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC

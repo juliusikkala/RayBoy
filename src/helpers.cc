@@ -165,6 +165,7 @@ vkres<VkImage> create_gpu_image(
     VkSampleCountFlagBits samples,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
+    VkImageViewType type,
     size_t bytes,
     void* data,
     bool mipmapped
@@ -176,12 +177,12 @@ vkres<VkImage> create_gpu_image(
     VkImageCreateInfo info = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         nullptr,
-        0,
+        type == VK_IMAGE_VIEW_TYPE_CUBE ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0u,
         VK_IMAGE_TYPE_2D,
         format,
         {size.x, size.y, 1},
         mipmapped ? calculate_mipmap_count(size) : 1,
-        1,
+        type == VK_IMAGE_VIEW_TYPE_CUBE ? 6u : 1u,
         samples,
         tiling,
         usage,
