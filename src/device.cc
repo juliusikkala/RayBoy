@@ -36,17 +36,17 @@ device::device(
     VkSurfaceKHR surface,
     const std::vector<const char*>& validation_layers
 ){
-    const char* required_device_extensions[] = {
+    const char* device_extensions[] = {
         VK_KHR_MAINTENANCE1_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
-    const char* rt_device_extensions[] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
     };
+    const uint32_t required_extension_count = 3;
+    const uint32_t rt_extension_count = required_extension_count + 4;
 
     // Find all physical devices
     uint32_t physical_device_count = 0;
@@ -68,10 +68,10 @@ device::device(
         vkEnumerateDeviceExtensionProperties(device, nullptr, &available_count, extensions.data());
 
         bool found_all_required = true;
-        if(!has_all_extensions(extensions, required_device_extensions, std::size(required_device_extensions)))
+        if(!has_all_extensions(extensions, device_extensions, required_extension_count))
             continue;
 
-        bool current_has_rt = has_all_extensions(extensions, rt_device_extensions, std::size(rt_device_extensions));
+        bool current_has_rt = has_all_extensions(extensions, device_extensions, std::size(device_extensions));
         bool current_is_discrete = physical_device_props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
         // Find required queue families
@@ -104,7 +104,9 @@ device::device(
         }
 
         // Get properties
-        VkPhysicalDeviceProperties2 properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, nullptr};
+        VkPhysicalDeviceProperties2 properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &rt_pipeline_properties};
+        rt_pipeline_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR, &as_properties};
+        as_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR, nullptr};
         vkGetPhysicalDeviceProperties2(device, &properties);
 
         // Found a suitable device
@@ -149,6 +151,8 @@ device::device(
     vulkan12_features.scalarBlockLayout = VK_TRUE;
     buffer_address_features.bufferDeviceAddress = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
+    rt_pipeline_features.rayTracingPipeline = VK_TRUE;
+    as_features.accelerationStructure = VK_TRUE;
 
     // Create device
     float priority = 1.0f;
@@ -165,7 +169,7 @@ device::device(
         {},
         std::size(queue_infos), queue_infos,
         (uint32_t)validation_layers.size(), validation_layers.data(),
-        std::size(required_device_extensions), required_device_extensions,
+        found_rt_device ? rt_extension_count : required_extension_count, device_extensions,
         nullptr
     };
     vkCreateDevice(physical_device, &device_create_info, nullptr, &logical_device);

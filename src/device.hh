@@ -28,7 +28,9 @@ struct device
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_address_features;
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties;
     VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features;
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties;
     int32_t compute_family_index;
     int32_t graphics_family_index;
     VkQueue graphics_queue;
