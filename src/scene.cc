@@ -66,13 +66,21 @@ struct gpu_scene_params
 
 }
 
-scene::scene(context& ctx, ecs& e, size_t max_entries, size_t max_textures)
-:   e(&e), max_entries(max_entries), max_textures(max_textures),
+scene::scene(context& ctx, ecs& e, bool ray_tracing, size_t max_entries, size_t max_textures)
+:   ctx(&ctx), e(&e), max_entries(max_entries), max_textures(max_textures),
+    ray_tracing(ray_tracing),
     instances(ctx, max_entries*sizeof(gpu_instance), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     point_lights(ctx, max_entries*sizeof(gpu_point_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     directional_lights(ctx, max_entries*sizeof(gpu_directional_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     cameras(ctx, max_entries*sizeof(gpu_camera), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     scene_params(ctx, sizeof(gpu_scene_params), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+    tlas(ctx), tlas_buffer(ctx), tlas_scratch(ctx),
+    rt_instances(
+        ctx,
+        0,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT|
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
+    ), tlas_first_build(true),
     filler_texture(
         ctx, uvec2(1), VK_FORMAT_R8G8B8A8_UNORM, 0, nullptr,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -90,6 +98,8 @@ scene::scene(context& ctx, ecs& e, size_t max_entries, size_t max_textures)
     irradiance_sampler(ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 1, 0.0f, 0.0f),
     filler_buffer(create_gpu_buffer(ctx, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT))
 {
+    if(ray_tracing)
+        init_rt();
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
         update(i);
 }
@@ -114,9 +124,10 @@ void scene::update(uint32_t image_index)
     vertex_buffers.clear();
     index_buffers.clear();
     instance_meshes.clear();
+    instance_transforms.clear();
     instance_visible.clear();
     instance_material.clear();
- 
+
     e->foreach([&](entity id, environment_map& e) {
         envmap_indices[&e] = cubemap_textures.size();
         cubemap_textures.push_back(e.get_radiance()->get_image_view(image_index));
@@ -171,6 +182,7 @@ void scene::update(uint32_t image_index)
                     index_buffers.push_back(group.mesh->get_index_buffer());
                 }
                 instance_meshes.push_back(group.mesh);
+                instance_transforms.push_back(inst.model_to_world);
                 // Rayboy hack: inner parts of the console are marked as such,
                 // and won't be rasterized! They're only visible with ray
                 // tracing!
@@ -236,6 +248,25 @@ void scene::update(uint32_t image_index)
         });
     });
     scene_params.update(image_index, params);
+
+    if(ray_tracing)
+    {
+        rt_instances.update<VkAccelerationStructureInstanceKHR>(image_index, [&](VkAccelerationStructureInstanceKHR* data) {
+            for(size_t i = 0; i < instance_meshes.size(); ++i)
+            {
+                data[i] = {
+                    {}, (uint32_t)i, 1, 0,
+                    VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+                    instance_meshes[i]->get_blas_address()
+                };
+                mat4 t = transpose(instance_transforms[i]);
+                memcpy(
+                    &data[i].transform, &t,
+                    sizeof(data[i].transform)
+                );
+            }
+        });
+    }
 }
 
 void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
@@ -245,6 +276,18 @@ void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
     directional_lights.upload(cmd, image_index);
     cameras.upload(cmd, image_index);
     scene_params.upload(cmd, image_index);
+
+    if(ray_tracing)
+    {
+        if(tlas_first_build)
+        {
+            VkCommandBuffer cmd = begin_command_buffer(*ctx);
+            upload_rt(cmd, image_index, true);
+            end_command_buffer(*ctx, cmd);
+            tlas_first_build = false;
+        }
+        upload_rt(cmd, image_index, false);
+    }
 }
 
 ecs& scene::get_ecs() const
@@ -254,7 +297,7 @@ ecs& scene::get_ecs() const
 
 std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
 {
-    return {
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
         // instances
         {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // point_lights
@@ -269,11 +312,21 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
         // Scene params
         {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        // vertex buffers
-        {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr},
-        // index buffers
-        {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
     };
+
+    if(ray_tracing)
+    {
+        // vertex buffers
+        bindings.push_back(
+            {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
+        );
+        // index buffers
+        bindings.push_back(
+            {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
+        );
+    }
+
+    return bindings;
 }
 
 void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
@@ -286,8 +339,12 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
     pipeline.set_descriptor(image_index, 4, textures, samplers);
     pipeline.set_descriptor(image_index, 5, cubemap_textures, cubemap_samplers);
     pipeline.set_descriptor(image_index, 6, {scene_params[image_index]});
-    pipeline.set_descriptor(image_index, 7, vertex_buffers);
-    pipeline.set_descriptor(image_index, 8, index_buffers);
+
+    if(ray_tracing)
+    {
+        pipeline.set_descriptor(image_index, 7, vertex_buffers);
+        pipeline.set_descriptor(image_index, 8, index_buffers);
+    }
 }
 
 size_t scene::get_instance_count() const
@@ -308,6 +365,156 @@ const material* scene::get_instance_material(size_t instance_id) const
 void scene::draw_instance(VkCommandBuffer buf, size_t instance_id) const
 {
     instance_meshes[instance_id]->draw(buf);
+}
+
+void scene::init_rt()
+{
+    rt_instances.resize(max_entries * sizeof(VkAccelerationStructureInstanceKHR));
+
+    VkAccelerationStructureGeometryKHR as_geom = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+        nullptr,
+        VK_GEOMETRY_TYPE_INSTANCES_KHR,
+        {},
+        0
+    };
+    as_geom.geometry.instances = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        nullptr,
+        VK_FALSE,
+        VkDeviceOrHostAddressConstKHR{rt_instances.get_device_address(0)}
+    };
+
+    VkAccelerationStructureBuildGeometryInfoKHR as_build_info = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+        nullptr,
+        VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR|
+        VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
+        VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
+        VK_NULL_HANDLE,
+        VK_NULL_HANDLE,
+        1,
+        &as_geom,
+        nullptr,
+        0
+    };
+
+    VkAccelerationStructureBuildSizesInfoKHR build_size = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
+        nullptr
+    };
+    uint32_t max_primitive_count = max_entries;
+    vkGetAccelerationStructureBuildSizesKHR(
+        ctx->get_device().logical_device,
+        VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+        &as_build_info,
+        &max_primitive_count,
+        &build_size
+    );
+
+    tlas_buffer = create_gpu_buffer(
+        *ctx,
+        build_size.accelerationStructureSize,
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR|
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+    );
+
+    VkAccelerationStructureCreateInfoKHR as_create_info = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+        nullptr,
+        0,
+        tlas_buffer,
+        0,
+        build_size.accelerationStructureSize,
+        VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        0
+    };
+
+    VkAccelerationStructureKHR as_tmp;
+    vkCreateAccelerationStructureKHR(ctx->get_device().logical_device, &as_create_info, nullptr, &as_tmp);
+    tlas = vkres(*ctx, as_tmp);
+
+    uint32_t alignment = ctx->get_device().as_properties.minAccelerationStructureScratchOffsetAlignment;
+    vkres<VkBuffer> scratch_buffer = create_gpu_buffer(
+        *ctx,
+        build_size.buildScratchSize + alignment,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+    );
+    VkBufferDeviceAddressInfo scratch_info = {
+        VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        nullptr,
+        scratch_buffer
+    };
+    scratch_address = vkGetBufferDeviceAddress(
+        ctx->get_device().logical_device,
+        &scratch_info
+    ) + alignment - (build_size.buildScratchSize % alignment);
+}
+
+void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refresh)
+{
+    rt_instances.upload(cmd, image_index);
+
+    VkMemoryBarrier2KHR barriers[] = {
+        {
+            VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,
+            nullptr,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT_KHR,
+            VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
+        },
+        {
+            VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,
+            nullptr,
+            VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
+        }
+    };
+    VkDependencyInfoKHR deps = {
+        VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR, nullptr, 0,
+        2, barriers, 0, nullptr, 0, nullptr
+    };
+    vkCmdPipelineBarrier2KHR(cmd, &deps);
+
+    VkAccelerationStructureGeometryKHR as_geom = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+        nullptr,
+        VK_GEOMETRY_TYPE_INSTANCES_KHR,
+        {},
+        0
+    };
+    as_geom.geometry.instances = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        nullptr,
+        VK_FALSE,
+        VkDeviceOrHostAddressConstKHR{rt_instances.get_device_address(0)}
+    };
+
+    VkAccelerationStructureBuildGeometryInfoKHR as_build_info = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+        nullptr,
+        VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR|
+        VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
+        full_refresh ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR,
+        full_refresh ? VK_NULL_HANDLE : *tlas,
+        tlas,
+        1,
+        &as_geom,
+        nullptr,
+        scratch_address
+    };
+
+    VkAccelerationStructureBuildRangeInfoKHR range = {
+        (uint32_t)instance_meshes.size(), 0, 0, 0
+    };
+    VkAccelerationStructureBuildRangeInfoKHR* range_ptr = &range;
+
+    vkCmdBuildAccelerationStructuresKHR(cmd, 1, &as_build_info, &range_ptr);
 }
 
 int32_t scene::get_st_index(material::sampler_tex st, uint32_t image_index)

@@ -11,7 +11,12 @@
 class scene_update_render_stage: public render_stage
 {
 public:
-    scene_update_render_stage(context& ctx, ecs& e, size_t max_entries = 512);
+    scene_update_render_stage(
+        context& ctx,
+        ecs& e,
+        bool ray_tracing,
+        size_t max_entries = 512
+    );
     ~scene_update_render_stage();
 
     const scene& get_scene() const;

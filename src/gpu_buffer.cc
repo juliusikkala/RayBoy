@@ -32,6 +32,15 @@ VkBuffer gpu_buffer::operator[](uint32_t image_index) const
     return image_index < buffers.size() ? *buffers[image_index] : *buffers.front();
 }
 
+VkDeviceAddress gpu_buffer::get_device_address(uint32_t image_index) const
+{
+    VkBuffer buf = operator[](image_index);
+    VkBufferDeviceAddressInfo info = {
+        VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, buf
+    };
+    return vkGetBufferDeviceAddress(ctx->get_device().logical_device, &info);
+}
+
 void gpu_buffer::update_ptr(uint32_t image_index, const void* data, size_t bytes)
 {
     if(staging_buffers.size() == 0) return;

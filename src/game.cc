@@ -402,7 +402,8 @@ void game::create_pipeline()
     else if(opt.mode == "fancy")
     {
         fancy_render_pipeline::options fancy_options = {
-            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
+            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples,
+            gfx_ctx->get_device().supports_ray_tracing
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
         material* screen_mat = &(*screen_model)[3].mat;
@@ -428,7 +429,8 @@ void game::refresh_pipeline_options()
     if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
     {
         fancy_render_pipeline::options fancy_options = {
-            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples
+            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples,
+            gfx_ctx->get_device().supports_ray_tracing
         };
         ptr->set_options(fancy_options);
     }

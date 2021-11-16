@@ -1,8 +1,12 @@
 #include "scene_update_render_stage.hh"
 #include "scene.hh"
 
-scene_update_render_stage::scene_update_render_stage(context& ctx, ecs& e, size_t max_entries)
-: render_stage(ctx), e(&e), s(ctx, e, max_entries), stage_timer(ctx, "scene_update_render_stage")
+scene_update_render_stage::scene_update_render_stage(
+    context& ctx,
+    ecs& e,
+    bool ray_tracing,
+    size_t max_entries
+): render_stage(ctx), e(&e), s(ctx, e, ray_tracing, max_entries), stage_timer(ctx, "scene_update_render_stage")
 {
     for(size_t i = 0; i < ctx.get_image_count(); ++i)
     {

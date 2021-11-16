@@ -57,7 +57,7 @@ forward_render_stage::forward_render_stage(
         };
     }
     std::vector<VkDescriptorSetLayoutBinding> bindings = s.get_bindings();
-    bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    bindings.push_back({10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
     gfx.init(
         gfx_params,
@@ -73,7 +73,7 @@ forward_render_stage::forward_render_stage(
     {
         // Assign descriptors
         s.set_descriptors(gfx, i);
-        gfx.set_descriptor(i, 9, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+        gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
 
         // Record command buffer
         VkCommandBuffer buf = graphics_commands();

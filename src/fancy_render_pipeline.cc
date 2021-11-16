@@ -92,7 +92,7 @@ void fancy_render_pipeline::reset()
     emulator_stage.reset(new emulator_render_stage(
         *ctx, *emu, gb_pixels_target, true, true, false
     ));
-    scene_update_stage.reset(new scene_update_render_stage(*ctx, *entities));
+    scene_update_stage.reset(new scene_update_render_stage(*ctx, *entities, opt.ray_tracing));
     forward_stage.reset(new forward_render_stage(
         *ctx,
         &color_target,

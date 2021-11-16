@@ -22,6 +22,7 @@ public:
     bool resize(size_t size);
 
     VkBuffer operator[](uint32_t image_index) const;
+    VkDeviceAddress get_device_address(uint32_t image_index) const;
 
     void update_ptr(uint32_t image_index, const void* data, size_t bytes = 0);
     template<typename T>
