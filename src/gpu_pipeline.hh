@@ -30,6 +30,12 @@ public:
         std::vector<VkBuffer> buffer
     );
 
+    void set_descriptor(
+        size_t set_index,
+        size_t binding_index,
+        VkAccelerationStructureKHR tlas
+    );
+
     void push_constants(VkCommandBuffer buf, const void* data);
 
     context* ctx;

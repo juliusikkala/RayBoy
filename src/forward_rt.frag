@@ -1,16 +1,19 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : enable
-
-#include "scene.glsl"
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_ray_tracing : enable
+#extension GL_EXT_ray_query : enable
 
 layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
-    uint shadow_rays; // Unused here
-    uint reflection_rays; // Unused here
+    uint shadow_rays;
+    uint reflection_rays;
 } pc;
+
+#include "rt.glsl"
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
@@ -80,3 +83,4 @@ void main()
 
     color = vec4(lighting, alpha);
 }
+

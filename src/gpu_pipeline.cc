@@ -139,6 +139,27 @@ void gpu_pipeline::set_descriptor(
     vkUpdateDescriptorSets(ctx->get_device().logical_device, 1, &write, 0,  nullptr);
 }
 
+void gpu_pipeline::set_descriptor(
+    size_t set_index,
+    size_t binding_index,
+    VkAccelerationStructureKHR tlas
+){
+    VkDescriptorSetLayoutBinding bind = find_binding(binding_index);
+
+    VkWriteDescriptorSetAccelerationStructureKHR as_write = {
+        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+        nullptr, 1, &tlas
+    };
+
+    VkWriteDescriptorSet write = {
+        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, &as_write,
+        descriptor_sets[set_index], (uint32_t)binding_index, 0,
+        (uint32_t)1, bind.descriptorType,
+        nullptr, nullptr, nullptr
+    };
+    vkUpdateDescriptorSets(ctx->get_device().logical_device, 1, &write, 0,  nullptr);
+}
+
 void gpu_pipeline::push_constants(VkCommandBuffer buf, const void* data)
 {
     vkCmdPushConstants(

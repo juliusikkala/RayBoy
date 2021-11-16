@@ -49,14 +49,6 @@ struct directional_light
     vec4 direction;
 };
 
-struct vertex
-{
-    vec3 pos;
-    vec3 normal;
-    vec2 uv;
-    vec4 tangent;
-};
-
 layout(binding = 0) buffer instance_buffer
 {
     instance array[];

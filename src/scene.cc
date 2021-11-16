@@ -324,6 +324,10 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         bindings.push_back(
             {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
         );
+        // TLAS
+        bindings.push_back(
+            {9, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL, nullptr}
+        );
     }
 
     return bindings;
@@ -344,6 +348,7 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
     {
         pipeline.set_descriptor(image_index, 7, vertex_buffers);
         pipeline.set_descriptor(image_index, 8, index_buffers);
+        pipeline.set_descriptor(image_index, 9, *tlas);
     }
 }
 

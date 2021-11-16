@@ -27,8 +27,7 @@ struct device
     VkPhysicalDeviceVulkan12Features vulkan12_features;
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_address_features;
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features;
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties;
+    VkPhysicalDeviceRayQueryFeaturesKHR rq_features;
     VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features;
     VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties;
     int32_t compute_family_index;

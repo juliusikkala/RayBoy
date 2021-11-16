@@ -2,6 +2,7 @@
 #include "io.hh"
 #include "forward.frag.h"
 #include "forward.vert.h"
+#include "forward_rt.frag.h"
 
 namespace
 {
@@ -10,6 +11,8 @@ struct push_constants
 {
     uint32_t instance_id;
     uint32_t camera_id;
+    uint32_t shadow_rays;
+    uint32_t reflection_rays;
 };
 
 }
@@ -19,8 +22,9 @@ forward_render_stage::forward_render_stage(
     render_target* color_target,
     render_target* depth_target,
     const scene& s,
-    entity cam_id
-):  render_stage(ctx), gfx(ctx), stage_timer(ctx, "forward_render_stage"),
+    entity cam_id,
+    const options& opt
+):  render_stage(ctx), gfx(ctx), opt(opt), stage_timer(ctx, "forward_render_stage"),
     cam_id(cam_id), brdf_integration(ctx, get_readonly_path("data/brdf_integration.ktx")),
     brdf_integration_sampler(
         ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
@@ -32,9 +36,16 @@ forward_render_stage::forward_render_stage(
 
     sd.vertex_bytes = sizeof(forward_vert_shader_binary);
     sd.vertex_data = forward_vert_shader_binary;
-
-    sd.fragment_bytes = sizeof(forward_frag_shader_binary);
-    sd.fragment_data = forward_frag_shader_binary;
+    if(opt.ray_tracing)
+    {
+        sd.fragment_bytes = sizeof(forward_rt_frag_shader_binary);
+        sd.fragment_data = forward_rt_frag_shader_binary;
+    }
+    else
+    {
+        sd.fragment_bytes = sizeof(forward_frag_shader_binary);
+        sd.fragment_data = forward_frag_shader_binary;
+    }
 
     std::vector<render_target*> targets;
     if(color_target) targets.push_back(color_target);
@@ -67,7 +78,7 @@ forward_render_stage::forward_render_stage(
         sizeof(push_constants)
     );
 
-    push_constants pc = {0, 0};
+    push_constants pc = {0, 0, opt.shadow_rays, opt.reflection_rays};
 
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
     {

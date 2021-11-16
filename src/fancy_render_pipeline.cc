@@ -93,12 +93,16 @@ void fancy_render_pipeline::reset()
         *ctx, *emu, gb_pixels_target, true, true, false
     ));
     scene_update_stage.reset(new scene_update_render_stage(*ctx, *entities, opt.ray_tracing));
+    forward_render_stage::options frs_opt = {
+        opt.ray_tracing
+    };
     forward_stage.reset(new forward_render_stage(
         *ctx,
         &color_target,
         &depth_target,
         scene_update_stage->get_scene(),
-        0
+        0,
+        frs_opt
     ));
     tonemap_stage.reset(new tonemap_render_stage(
         *ctx,

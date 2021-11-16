@@ -41,7 +41,7 @@ device::device(
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
         VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_RAY_QUERY_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
     };
@@ -104,8 +104,7 @@ device::device(
         }
 
         // Get properties
-        VkPhysicalDeviceProperties2 properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &rt_pipeline_properties};
-        rt_pipeline_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR, &as_properties};
+        VkPhysicalDeviceProperties2 properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &as_properties};
         as_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR, nullptr};
         vkGetPhysicalDeviceProperties2(device, &properties);
 
@@ -138,8 +137,8 @@ device::device(
     physical_device_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &vulkan12_features};
     vulkan12_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &sync2_features};
     sync2_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR, &buffer_address_features};
-    buffer_address_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_ADDRESS_FEATURES_EXT, &rt_pipeline_features};
-    rt_pipeline_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR, &as_features};
+    buffer_address_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_ADDRESS_FEATURES_EXT, &rq_features};
+    rq_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR, &as_features};
     as_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR, nullptr};
     vkGetPhysicalDeviceFeatures2(physical_device, &physical_device_features);
 
@@ -151,7 +150,7 @@ device::device(
     vulkan12_features.scalarBlockLayout = VK_TRUE;
     buffer_address_features.bufferDeviceAddress = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
-    rt_pipeline_features.rayTracingPipeline = VK_TRUE;
+    rq_features.rayQuery = VK_TRUE;
     as_features.accelerationStructure = VK_TRUE;
 
     // Create device
