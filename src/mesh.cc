@@ -86,9 +86,10 @@ mesh::mesh(
             &build_size
         );
 
+        uint32_t alignment = ctx.get_device().as_properties.minAccelerationStructureScratchOffsetAlignment;
         vkres<VkBuffer> scratch_buffer = create_gpu_buffer(
             ctx,
-            build_size.buildScratchSize,
+            build_size.buildScratchSize + alignment,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
         );
         VkBufferDeviceAddressInfo scratch_info = {
@@ -99,7 +100,7 @@ mesh::mesh(
         as_build_info.scratchData.deviceAddress = vkGetBufferDeviceAddress(
             ctx.get_device().logical_device,
             &scratch_info
-        );
+        ) + alignment - (build_size.buildScratchSize % alignment);
 
         vkres<VkBuffer> uncompact_blas_buffer = create_gpu_buffer(
             ctx,
