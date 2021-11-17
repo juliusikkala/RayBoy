@@ -62,7 +62,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         0,
         has_depth_stencil ? VK_TRUE : VK_FALSE,
         has_depth_stencil ? VK_TRUE : VK_FALSE,
-        VK_COMPARE_OP_LESS,
+        VK_COMPARE_OP_LESS_OR_EQUAL,
         VK_FALSE,
         VK_FALSE,
         {},

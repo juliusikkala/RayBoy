@@ -238,19 +238,24 @@ void scene::update(uint32_t image_index)
 
     if(ray_tracing)
     {
+        rt_instance_count = 0;
         rt_instances.update<VkAccelerationStructureInstanceKHR>(image_index, [&](VkAccelerationStructureInstanceKHR* data) {
-            for(size_t i = 0; i < instance_meshes.size(); ++i)
+            for(size_t i = 0, j = 0; i < instance_meshes.size(); ++i)
             {
-                data[i] = {
+                if(!instance_visible[i])
+                    continue;
+                data[j] = {
                     {}, (uint32_t)i, instance_material[i]->potentially_transparent() ? 2 : 1, 0,
                     VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
                     instance_meshes[i]->get_blas_address()
                 };
                 mat4 t = transpose(instance_transforms[i]);
                 memcpy(
-                    &data[i].transform, &t,
-                    sizeof(data[i].transform)
+                    &data[j].transform, &t,
+                    sizeof(data[j].transform)
                 );
+                rt_instance_count++;
+                j++;
             }
         });
     }
@@ -495,7 +500,7 @@ void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refre
         nullptr,
         VK_GEOMETRY_TYPE_INSTANCES_KHR,
         {},
-        0
+        VK_GEOMETRY_OPAQUE_BIT_KHR
     };
     as_geom.geometry.instances = {
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
@@ -520,7 +525,7 @@ void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refre
     };
 
     VkAccelerationStructureBuildRangeInfoKHR range = {
-        (uint32_t)instance_meshes.size(), 0, 0, 0
+        (uint32_t)rt_instance_count, 0, 0, 0
     };
     VkAccelerationStructureBuildRangeInfoKHR* range_ptr = &range;
 

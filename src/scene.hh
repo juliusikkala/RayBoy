@@ -63,6 +63,7 @@ private:
     vkres<VkBuffer> tlas_buffer;
     vkres<VkBuffer> tlas_scratch;
     gpu_buffer rt_instances;
+    size_t rt_instance_count;
     VkDeviceAddress scratch_address;
     bool tlas_first_build;
 

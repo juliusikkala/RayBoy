@@ -35,6 +35,8 @@ set(shader_src
     src/tonemap.comp
     src/tonemap_msaa.comp
     src/emulator_transform.comp
+    src/depth.vert
+    src/depth.frag
     # Add more shader sources here
 )
 set(shader_binary
@@ -45,6 +47,8 @@ set(shader_binary
     tonemap.comp.h
     tonemap_msaa.comp.h
     emulator_transform.comp.h
+    depth.vert.h
+    depth.frag.h
     # Add more shader binaries here
 )
 

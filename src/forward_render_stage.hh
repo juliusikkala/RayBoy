@@ -16,7 +16,7 @@ public:
     struct options
     {
         bool ray_tracing = false;
-        unsigned shadow_rays = 1;
+        unsigned shadow_rays = 8;
         unsigned reflection_rays = 1;
         bool refract = false;
     };
@@ -36,10 +36,12 @@ protected:
     void update_buffers(uint32_t image_index) override;
 
 private:
+    graphics_pipeline depth_pre_pass;
     graphics_pipeline gfx;
     options opt;
     entity cam_id;
     texture brdf_integration;
+    texture blue_noise;
     sampler brdf_integration_sampler;
     timer stage_timer;
 };

@@ -132,11 +132,9 @@ void get_point_light_info(
     point_light l,
     vec3 pos,
     out vec3 dir,
-    out vec3 lpos,
     out vec3 color
 ){
-    lpos = l.pos_falloff.xyz;
-    dir = lpos - pos;
+    dir = l.pos_falloff.xyz - pos;
     float dist2 = dot(dir, dir);
     float dist = sqrt(dist2);
     dir /= dist;

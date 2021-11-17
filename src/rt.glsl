@@ -1,6 +1,7 @@
 #ifndef RT_GLSL
 #define RT_GLSL
 #include "scene.glsl"
+#include "poisson_samples_2d.glsl"
 
 struct vertex_attribs
 {
@@ -21,6 +22,8 @@ layout(binding = 8) buffer index_buffer
 {
     uint array[];
 } indices[];
+
+layout(binding = 9) uniform sampler2D blue_noise;
 
 struct vertex_data
 {
@@ -71,7 +74,7 @@ vec3 shadow_ray(vec3 start, vec3 end)
     rayQueryInitializeEXT(
         rq,
         tlas,
-        gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsOpaqueEXT,
+        gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsOpaqueEXT|gl_RayFlagsSkipClosestHitShaderEXT,
         1,
         start,
         1e-4,
@@ -108,6 +111,53 @@ float distance_ray(vec3 start, vec3 dir)
     }
 
     return 1e3;
+}
+
+mat3 create_tangent_space(vec3 normal)
+{
+    vec3 major;
+    if(abs(normal.x) < 0.57735026918962576451) major = vec3(1,0,0);
+    else if(abs(normal.y) < 0.57735026918962576451) major = vec3(0,1,0);
+    else major = vec3(0,0,1);
+
+    vec3 tangent = normalize(cross(normal, major));
+    vec3 bitangent = cross(normal, tangent);
+
+    return mat3(tangent, bitangent, normal);
+}
+
+vec3 point_light_shadow(vec3 position, point_light pl)
+{
+    vec3 pos = pl.pos_falloff.xyz;
+    float radius = pl.color_radius.w;
+    vec3 shadow = vec3(0);
+    if(SHADOW_RAY_COUNT == 1)
+    { // Hard shadows
+        shadow += shadow_ray(position, pos);
+    }
+    else
+    { // Soft shadows
+        vec3 dir = pos - position;
+        float dist = length(dir);
+        dir /= dist;
+        mat3 tbn = create_tangent_space(dir);
+        ivec2 noise_pos = ivec2(mod(gl_FragCoord.xy, vec2(textureSize(blue_noise, 0))));
+        float angle = texelFetch(blue_noise, noise_pos, 0).x;
+        vec2 cs = vec2(cos(angle*2*3.141592), sin(angle*2*3.141592));
+        vec3 tangent = tbn[0];
+        vec3 bitangent = tbn[1];
+        tbn[0] = tangent*cs.x-bitangent*cs.y;
+        tbn[1] = tangent*cs.y+bitangent*cs.x;
+
+        [[unroll]] for(uint i = 0; i < SHADOW_RAY_COUNT; ++i)
+        {
+            vec2 off2d = poisson_disk_samples[i];
+            // This is probably not actually correct but idgaf
+            vec3 off = tbn * vec3(off2d * radius, dist);
+            shadow += shadow_ray(position, position + off);
+        }
+    }
+    return shadow/SHADOW_RAY_COUNT;
 }
 
 #endif

@@ -4,6 +4,7 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_ray_query : enable
+#extension GL_EXT_control_flow_attributes : enable
 
 layout(push_constant) uniform push_constant_buffer
 {
@@ -54,19 +55,19 @@ void main()
         mat
     ) + mat.emission;
 
-    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
+    [[unroll]] for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
-        vec3 light_pos;
         vec3 color;
-        get_point_light_info(point_lights.array[i], position, light_dir, light_pos, color);
+        const point_light pl = point_lights.array[i];
+        get_point_light_info(pl, position, light_dir, color);
         // Hack to prevent normal map weirdness at grazing angles
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        vec3 shadow = shadow_ray(position, light_pos);
+        vec3 shadow = point_light_shadow(position, pl);
         lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
     }
 
-    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
+    [[unroll]] for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
         vec3 color;
