@@ -3,8 +3,7 @@
 
 bool material::potentially_transparent() const
 {
-    return color_factor.a < 1.0f || transmittance > 0.0f ||
-        (color_texture.second && color_texture.second->potentially_transparent());
+    return transmittance > 0.0f;
 }
 
 size_t std::hash<material::sampler_tex>::operator()(const material::sampler_tex& v) const

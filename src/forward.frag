@@ -8,8 +8,6 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
-    uint shadow_rays; // Unused here
-    uint reflection_rays; // Unused here
 } pc;
 
 layout(location = 0) in vec3 position;
@@ -50,7 +48,7 @@ void main()
         mat
     ) + mat.emission;
 
-    for(uint i = 0; i < scene_params.point_light_count; ++i)
+    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
         vec3 light_pos;
@@ -61,7 +59,7 @@ void main()
         lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
     }
 
-    for(uint i = 0; i < scene_params.directional_light_count; ++i)
+    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
         vec3 color;

@@ -10,7 +10,9 @@ struct vertex_attribs
     vec4 tangent;
 };
 
-layout(binding = 9, scalar) buffer vertex_buffer
+layout(binding = 6) uniform accelerationStructureEXT tlas;
+
+layout(binding = 7, scalar) buffer vertex_buffer
 {
     vertex_attribs array[];
 } vertices[];
@@ -19,13 +21,6 @@ layout(binding = 8) buffer index_buffer
 {
     uint array[];
 } indices[];
-
-layout(binding = 9) uniform accelerationStructureEXT tlas;
-
-layout(binding = 10, scalar) buffer shadow_sample_buffer
-{
-    vec2 shadow_samples[];
-} shadow_samples;
 
 struct vertex_data
 {
@@ -73,15 +68,20 @@ vec3 shadow_ray(vec3 start, vec3 end)
     float len = length(dir);
     dir /= len;
     rayQueryEXT rq;
-    rayQueryInitializeEXT(rq, tlas, gl_RayFlagsNoneEXT, 0xFF, start, 1e-4, dir, len);
+    rayQueryInitializeEXT(
+        rq,
+        tlas,
+        gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsOpaqueEXT,
+        1,
+        start,
+        1e-4,
+        dir,
+        len
+    );
 
     vec3 visibility = vec3(1);
 
-    while(rayQueryProceedEXT(rq))
-    {
-        // TODO: Check material for non-opaque objects, apply to visibility
-        rayQueryConfirmIntersectionEXT(rq);
-    }
+    rayQueryProceedEXT(rq);
 
     if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
     {

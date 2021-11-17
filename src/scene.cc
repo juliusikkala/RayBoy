@@ -57,13 +57,6 @@ struct gpu_directional_light
     vec4 direction;
 };
 
-struct gpu_scene_params
-{
-    uint32_t point_light_count;
-    uint32_t directional_light_count;
-};
-
-
 }
 
 scene::scene(context& ctx, ecs& e, bool ray_tracing, size_t max_entries, size_t max_textures)
@@ -73,7 +66,6 @@ scene::scene(context& ctx, ecs& e, bool ray_tracing, size_t max_entries, size_t 
     point_lights(ctx, max_entries*sizeof(gpu_point_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     directional_lights(ctx, max_entries*sizeof(gpu_directional_light), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
     cameras(ctx, max_entries*sizeof(gpu_camera), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
-    scene_params(ctx, sizeof(gpu_scene_params), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     tlas(ctx), tlas_buffer(ctx), tlas_scratch(ctx),
     rt_instances(
         ctx,
@@ -199,7 +191,6 @@ void scene::update(uint32_t image_index)
     vertex_buffers.resize(max_entries, filler_buffer);
     index_buffers.resize(max_entries, filler_buffer);
 
-    gpu_scene_params params = {0, 0};
     point_lights.update<gpu_point_light>(image_index, [&](gpu_point_light* data){
         size_t i = 0;
         e->foreach([&](entity id, transformable& t, point_light& l) {
@@ -208,7 +199,6 @@ void scene::update(uint32_t image_index)
                 vec4(t.get_global_position(), 0),
                 vec4(t.get_global_direction(), 0)
             };
-            params.point_light_count++;
         });
         e->foreach([&](entity id, transformable& t, spotlight& l) {
             data[i++] = {
@@ -216,7 +206,6 @@ void scene::update(uint32_t image_index)
                 vec4(t.get_global_position(), l.get_falloff_exponent()),
                 vec4(t.get_global_direction(), cos(radians(l.get_cutoff_angle())))
             };
-            params.point_light_count++;
         });
     });
 
@@ -227,7 +216,6 @@ void scene::update(uint32_t image_index)
                 vec4(l.get_color(), 1),
                 vec4(t.get_global_direction(), cos(radians(l.get_radius())))
             };
-            params.directional_light_count++;
         });
     });
 
@@ -247,7 +235,6 @@ void scene::update(uint32_t image_index)
             };
         });
     });
-    scene_params.update(image_index, params);
 
     if(ray_tracing)
     {
@@ -255,7 +242,7 @@ void scene::update(uint32_t image_index)
             for(size_t i = 0; i < instance_meshes.size(); ++i)
             {
                 data[i] = {
-                    {}, (uint32_t)i, 1, 0,
+                    {}, (uint32_t)i, instance_material[i]->potentially_transparent() ? 2 : 1, 0,
                     VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
                     instance_meshes[i]->get_blas_address()
                 };
@@ -275,7 +262,6 @@ void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
     point_lights.upload(cmd, image_index);
     directional_lights.upload(cmd, image_index);
     cameras.upload(cmd, image_index);
-    scene_params.upload(cmd, image_index);
 
     if(ray_tracing)
     {
@@ -310,12 +296,14 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
         // Cubemap textures
         {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)max_textures, VK_SHADER_STAGE_ALL, nullptr},
-        // Scene params
-        {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     if(ray_tracing)
     {
+        // TLAS
+        bindings.push_back(
+            {6, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL, nullptr}
+        );
         // vertex buffers
         bindings.push_back(
             {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
@@ -324,13 +312,21 @@ std::vector<VkDescriptorSetLayoutBinding> scene::get_bindings() const
         bindings.push_back(
             {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)max_entries, VK_SHADER_STAGE_ALL, nullptr}
         );
-        // TLAS
-        bindings.push_back(
-            {9, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL, nullptr}
-        );
     }
 
     return bindings;
+}
+
+std::vector<VkSpecializationMapEntry> scene::get_specialization_entries() const
+{
+    return {
+        {0, 0, sizeof(uint32_t)},
+        {1, sizeof(uint32_t), sizeof(uint32_t)}
+    };
+}
+std::vector<uint32_t> scene::get_specialization_data() const
+{
+    return {get_point_light_count(), get_directional_light_count()};
 }
 
 void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
@@ -342,19 +338,28 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
 
     pipeline.set_descriptor(image_index, 4, textures, samplers);
     pipeline.set_descriptor(image_index, 5, cubemap_textures, cubemap_samplers);
-    pipeline.set_descriptor(image_index, 6, {scene_params[image_index]});
 
     if(ray_tracing)
     {
+        pipeline.set_descriptor(image_index, 6, *tlas);
         pipeline.set_descriptor(image_index, 7, vertex_buffers);
         pipeline.set_descriptor(image_index, 8, index_buffers);
-        pipeline.set_descriptor(image_index, 9, *tlas);
     }
 }
 
 size_t scene::get_instance_count() const
 {
     return instance_meshes.size();
+}
+
+size_t scene::get_point_light_count() const
+{
+    return e->count<point_light>() + e->count<spotlight>();
+}
+
+size_t scene::get_directional_light_count() const
+{
+    return e->count<directional_light>();
 }
 
 bool scene::is_instance_visible(size_t instance_id) const

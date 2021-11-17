@@ -11,8 +11,6 @@ struct push_constants
 {
     uint32_t instance_id;
     uint32_t camera_id;
-    uint32_t shadow_rays;
-    uint32_t reflection_rays;
 };
 
 }
@@ -36,16 +34,27 @@ forward_render_stage::forward_render_stage(
 
     sd.vertex_bytes = sizeof(forward_vert_shader_binary);
     sd.vertex_data = forward_vert_shader_binary;
+    auto spec_entries = s.get_specialization_entries();
+    auto spec_data = s.get_specialization_data();
+
     if(opt.ray_tracing)
     {
         sd.fragment_bytes = sizeof(forward_rt_frag_shader_binary);
         sd.fragment_data = forward_rt_frag_shader_binary;
+        spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
+        spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
+        spec_data.push_back(opt.shadow_rays);
+        spec_data.push_back(opt.reflection_rays);
     }
     else
     {
         sd.fragment_bytes = sizeof(forward_frag_shader_binary);
         sd.fragment_data = forward_frag_shader_binary;
     }
+    sd.fragment_specialization.mapEntryCount = spec_entries.size();
+    sd.fragment_specialization.pMapEntries = spec_entries.data();
+    sd.fragment_specialization.dataSize = spec_data.size() * sizeof(uint32_t);
+    sd.fragment_specialization.pData = spec_data.data();
 
     std::vector<render_target*> targets;
     if(color_target) targets.push_back(color_target);
@@ -78,7 +87,7 @@ forward_render_stage::forward_render_stage(
         sizeof(push_constants)
     );
 
-    push_constants pc = {0, 0, opt.shadow_rays, opt.reflection_rays};
+    push_constants pc = {0, 0};
 
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
     {

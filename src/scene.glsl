@@ -49,6 +49,9 @@ struct directional_light
     vec4 direction;
 };
 
+layout(constant_id = 0) const uint POINT_LIGHT_COUNT = 0;
+layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 0;
+
 layout(binding = 0) buffer instance_buffer
 {
     instance array[];
@@ -72,12 +75,6 @@ layout(binding = 3) buffer camera_buffer
 layout(binding = 4) uniform sampler2D textures[];
 
 layout(binding = 5) uniform samplerCube cube_textures[];
-
-layout(binding = 6) uniform scene_params_buffer
-{
-    uint point_light_count;
-    uint directional_light_count;
-} scene_params;
 
 material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 {

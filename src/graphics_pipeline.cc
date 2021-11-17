@@ -126,16 +126,14 @@ void graphics_pipeline::init(
 
     // Load shaders
     std::vector<VkPipelineShaderStageCreateInfo> stages;
-    VkPipelineShaderStageCreateInfo tmp = {
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        nullptr, {}, {}, VK_NULL_HANDLE, "main", nullptr
-    };
     vkres<VkShaderModule> vertex_shader = load_shader(*ctx, sd.vertex_bytes, sd.vertex_data);
     if(vertex_shader != VK_NULL_HANDLE)
     {
-        tmp.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        tmp.module = vertex_shader;
-        stages.push_back(tmp);
+        stages.push_back({
+            VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            nullptr, {}, VK_SHADER_STAGE_VERTEX_BIT, vertex_shader,
+            "main", &sd.vertex_specialization
+        });
     }
 
     vkres<VkShaderModule> fragment_shader = load_shader(*ctx, sd.fragment_bytes, sd.fragment_data);
@@ -144,7 +142,7 @@ void graphics_pipeline::init(
         stages.push_back({
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             nullptr, {}, VK_SHADER_STAGE_FRAGMENT_BIT,
-            fragment_shader, "main", nullptr
+            fragment_shader, "main", &sd.fragment_specialization
         });
     }
 

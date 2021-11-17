@@ -8,9 +8,11 @@ struct shader_data
 {
     size_t vertex_bytes = 0;
     const uint32_t* vertex_data = nullptr;
+    VkSpecializationInfo vertex_specialization = {0, nullptr, 0, nullptr};
 
     size_t fragment_bytes = 0;
     const uint32_t* fragment_data = nullptr;
+    VkSpecializationInfo fragment_specialization = {0, nullptr, 0, nullptr};
 };
 
 class graphics_pipeline: public gpu_pipeline

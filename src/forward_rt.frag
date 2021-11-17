@@ -9,10 +9,10 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
-    // TODO: Use specialization constants instead. Same for light counts.
-    uint shadow_rays;
-    uint reflection_rays;
 } pc;
+
+layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
+layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
 
 #include "rt.glsl"
 
@@ -54,7 +54,7 @@ void main()
         mat
     ) + mat.emission;
 
-    for(uint i = 0; i < scene_params.point_light_count; ++i)
+    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
         vec3 light_pos;
@@ -66,7 +66,7 @@ void main()
         lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
     }
 
-    for(uint i = 0; i < scene_params.directional_light_count; ++i)
+    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
     {
         vec3 light_dir;
         vec3 color;

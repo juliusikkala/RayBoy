@@ -32,9 +32,14 @@ public:
     ecs& get_ecs() const;
 
     std::vector<VkDescriptorSetLayoutBinding> get_bindings() const;
+    std::vector<VkSpecializationMapEntry> get_specialization_entries() const;
+    std::vector<uint32_t> get_specialization_data() const;
+
     void set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const;
 
     size_t get_instance_count() const;
+    size_t get_point_light_count() const;
+    size_t get_directional_light_count() const;
     bool is_instance_visible(size_t instance_id) const;
     const material* get_instance_material(size_t instance_id) const;
     void draw_instance(VkCommandBuffer buf, size_t instance_id) const;
@@ -53,7 +58,6 @@ private:
     gpu_buffer point_lights;
     gpu_buffer directional_lights;
     gpu_buffer cameras;
-    gpu_buffer scene_params;
 
     vkres<VkAccelerationStructureKHR> tlas;
     vkres<VkBuffer> tlas_buffer;
