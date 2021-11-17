@@ -9,6 +9,7 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
+    // TODO: Use specialization constants instead. Same for light counts.
     uint shadow_rays;
     uint reflection_rays;
 } pc;
@@ -56,11 +57,13 @@ void main()
     for(uint i = 0; i < scene_params.point_light_count; ++i)
     {
         vec3 light_dir;
+        vec3 light_pos;
         vec3 color;
-        get_point_light_info(point_lights.array[i], position, light_dir, color);
+        get_point_light_info(point_lights.array[i], position, light_dir, light_pos, color);
         // Hack to prevent normal map weirdness at grazing angles
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
+        vec3 shadow = shadow_ray(position, light_pos);
+        lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
     }
 
     for(uint i = 0; i < scene_params.directional_light_count; ++i)
@@ -69,6 +72,7 @@ void main()
         vec3 color;
         get_directional_light_info(directional_lights.array[i], light_dir, color);
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
+        vec3 shadow = shadow_ray(position, position + light_dir*1e4);
         lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
     }
 

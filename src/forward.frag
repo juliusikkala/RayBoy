@@ -53,8 +53,9 @@ void main()
     for(uint i = 0; i < scene_params.point_light_count; ++i)
     {
         vec3 light_dir;
+        vec3 light_pos;
         vec3 color;
-        get_point_light_info(point_lights.array[i], position, light_dir, color);
+        get_point_light_info(point_lights.array[i], position, light_dir, light_pos, color);
         // Hack to prevent normal map weirdness at grazing angles
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
         lighting += terminator * brdf(color, color, light_dir, view_dir, mat);

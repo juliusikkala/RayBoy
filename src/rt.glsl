@@ -22,6 +22,11 @@ layout(binding = 8) buffer index_buffer
 
 layout(binding = 9) uniform accelerationStructureEXT tlas;
 
+layout(binding = 10, scalar) buffer shadow_sample_buffer
+{
+    vec2 shadow_samples[];
+} shadow_samples;
+
 struct vertex_data
 {
     vec3 pos;
@@ -60,6 +65,49 @@ vertex_data get_vertex_data(uint instance_index, uint primitive, vec2 barycentri
     vd.bitangent = normalize(cross(vd.normal, vd.tangent) * model_tangent.w);
 
     return vd;
+}
+
+vec3 shadow_ray(vec3 start, vec3 end)
+{
+    vec3 dir = end - start;
+    float len = length(dir);
+    dir /= len;
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, tlas, gl_RayFlagsNoneEXT, 0xFF, start, 1e-4, dir, len);
+
+    vec3 visibility = vec3(1);
+
+    while(rayQueryProceedEXT(rq))
+    {
+        // TODO: Check material for non-opaque objects, apply to visibility
+        rayQueryConfirmIntersectionEXT(rq);
+    }
+
+    if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+    {
+        visibility *= vec3(0);
+    }
+
+    return visibility;
+}
+
+// Mostly for debugging purposes.
+float distance_ray(vec3 start, vec3 dir)
+{
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, tlas, gl_RayFlagsNoneEXT, 0xFF, start, 1e-4, dir, 1e4);
+
+    while(rayQueryProceedEXT(rq))
+    {
+        rayQueryConfirmIntersectionEXT(rq);
+    }
+
+    if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+    {
+        return rayQueryGetIntersectionTEXT(rq, true);
+    }
+
+    return 1e3;
 }
 
 #endif
