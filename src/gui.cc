@@ -153,6 +153,85 @@ void gui::update()
 
             if(opts->mode == "fancy")
             {
+                if(ctx->get_device().supports_ray_tracing)
+                {
+                    if(ImGui::MenuItem("Ray tracing", NULL, opts->ray_tracing))
+                    {
+                        opts->ray_tracing = !opts->ray_tracing;
+                        SDL_Event e;
+                        e.type = SDL_USEREVENT;
+                        e.user.code = SET_RT_OPTION;
+                        SDL_PushEvent(&e);
+                    }
+                }
+                else
+                {
+                    ImGui::TextColored(
+                        ImVec4(0.4, 0.4, 0.4, 1.0),
+                        "Ray tracing not available"
+                    );
+                }
+
+                if(ctx->get_device().supports_ray_tracing && opts->ray_tracing)
+                {
+                    if(ImGui::BeginMenu("Shadow quality"))
+                    {
+                        static constexpr struct {
+                            const char* name;
+                            unsigned value;
+                        } shadow_options[] = {
+                            {"Off", 0},
+                            {"Lowest (1 ray, sharp edge)", 1},
+                            {"Low (2 rays, soft & very noisy)", 2},
+                            {"Medium (4 rays, soft & noisy)", 4},
+                            {"High (8 rays, soft & slightly noisy)", 8},
+                            {"Highest (16 rays, soft)", 16},
+                            {"Lagfest (32 rays, soft)", 32},
+                            {"Bullshot mode (64 rays, soft)", 64}
+                        };
+                        for(auto [name, value]: shadow_options)
+                        {
+                            if(ImGui::MenuItem(name, NULL, value == opts->shadow_rays))
+                            {
+                                opts->shadow_rays = value;
+                                SDL_Event e;
+                                e.type = SDL_USEREVENT;
+                                e.user.code = SET_RT_OPTION;
+                                SDL_PushEvent(&e);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                    if(ImGui::BeginMenu("Reflection quality"))
+                    {
+                        static constexpr struct {
+                            const char* name;
+                            unsigned value;
+                        } reflection_options[] = {
+                            {"Off", 0},
+                            {"Lowest (1 ray, sharp reflections only)", 1},
+                            {"Low (2 rays, all reflections, very noisy)", 2},
+                            {"Medium (4 rays, all reflections, noisy)", 4},
+                            {"High (8 rays, all reflections, slightly noisy)", 8},
+                            {"Highest (16 rays, all reflections)", 16},
+                            {"Lagfest (32 rays, all reflections)", 32},
+                            {"Bullshot mode (64 rays, all reflections)", 64}
+                        };
+                        for(auto [name, value]: reflection_options)
+                        {
+                            if(ImGui::MenuItem(name, NULL, value == opts->reflection_rays))
+                            {
+                                opts->reflection_rays = value;
+                                SDL_Event e;
+                                e.type = SDL_USEREVENT;
+                                e.user.code = SET_RT_OPTION;
+                                SDL_PushEvent(&e);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+
                 if(ImGui::BeginMenu("Console color"))
                 {
                     static constexpr struct {

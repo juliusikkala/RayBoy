@@ -118,6 +118,7 @@ void scene::update(uint32_t image_index)
     instance_meshes.clear();
     instance_transforms.clear();
     instance_visible.clear();
+    instance_background.clear();
     instance_material.clear();
 
     e->foreach([&](entity id, environment_map& e) {
@@ -130,7 +131,7 @@ void scene::update(uint32_t image_index)
 
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
-        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner) {
+        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner, background_entity* bg) {
             mat4 mat = t.get_global_transform();
             mat4 inv = inverseTranspose(mat);
             for(const model::vertex_group& group: m)
@@ -179,6 +180,7 @@ void scene::update(uint32_t image_index)
                 // and won't be rasterized! They're only visible with ray
                 // tracing!
                 instance_visible.push_back(inner == nullptr);
+                instance_background.push_back(bg != nullptr);
                 instance_material.push_back(&group.mat);
             }
         });
@@ -370,6 +372,11 @@ size_t scene::get_directional_light_count() const
 bool scene::is_instance_visible(size_t instance_id) const
 {
     return instance_visible[instance_id];
+}
+
+bool scene::is_instance_background(size_t instance_id) const
+{
+    return instance_background[instance_id];
 }
 
 const material* scene::get_instance_material(size_t instance_id) const

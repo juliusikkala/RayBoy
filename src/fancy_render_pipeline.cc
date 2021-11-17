@@ -94,7 +94,9 @@ void fancy_render_pipeline::reset()
     ));
     scene_update_stage.reset(new scene_update_render_stage(*ctx, *entities, opt.ray_tracing));
     forward_render_stage::options frs_opt = {
-        opt.ray_tracing
+        opt.ray_tracing,
+        opt.shadow_rays,
+        opt.reflection_rays
     };
     forward_stage.reset(new forward_render_stage(
         *ctx,

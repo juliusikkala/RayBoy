@@ -13,6 +13,10 @@
 class scene_change_handler;
 class environment_map;
 
+// Tag component for nodes that are considered background. They can use worse
+// rendering as lightmapping or other scams are expected.
+struct background_entity {};
+
 // This class is just a container for GPU assets concerning the entire scene;
 // it's not to be used for organizing the scene itself. Just use the ECS.
 class scene
@@ -41,6 +45,7 @@ public:
     size_t get_point_light_count() const;
     size_t get_directional_light_count() const;
     bool is_instance_visible(size_t instance_id) const;
+    bool is_instance_background(size_t instance_id) const;
     const material* get_instance_material(size_t instance_id) const;
     void draw_instance(VkCommandBuffer buf, size_t instance_id) const;
 
@@ -76,9 +81,11 @@ private:
     std::vector<VkSampler> cubemap_samplers;
     std::vector<VkBuffer> vertex_buffers;
     std::vector<VkBuffer> index_buffers;
+    // TODO: This is getting silly. Maybe make a struct or something.
     std::vector<const mesh*> instance_meshes;
     std::vector<mat4> instance_transforms;
     std::vector<bool> instance_visible;
+    std::vector<bool> instance_background;
     std::vector<const material*> instance_material;
     texture filler_texture;
     texture filler_cubemap;

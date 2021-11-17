@@ -131,7 +131,9 @@ vec3 point_light_shadow(vec3 position, point_light pl)
     vec3 pos = pl.pos_falloff.xyz;
     float radius = pl.color_radius.w;
     vec3 shadow = vec3(0);
-    if(SHADOW_RAY_COUNT == 1)
+    if(SHADOW_RAY_COUNT == 0)
+        return vec3(1);
+    else if(SHADOW_RAY_COUNT == 1)
     { // Hard shadows
         shadow += shadow_ray(position, pos);
     }

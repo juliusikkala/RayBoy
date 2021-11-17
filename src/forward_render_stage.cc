@@ -15,6 +15,125 @@ struct push_constants
     uint32_t camera_id;
 };
 
+void init_shading_pipeline(
+    bool ray_tracing,
+    graphics_pipeline& gfx,
+    context& ctx,
+    render_target* color_target,
+    render_target* depth_target,
+    const scene& s,
+    const forward_render_stage::options& opt,
+    bool background
+){ // Regular non-RT shading pipeline
+    shader_data sd;
+
+    sd.vertex_bytes = sizeof(forward_vert_shader_binary);
+    sd.vertex_data = forward_vert_shader_binary;
+    auto spec_entries = s.get_specialization_entries();
+    auto spec_data = s.get_specialization_data();
+
+    if(opt.ray_tracing)
+    {
+        sd.fragment_bytes = sizeof(forward_rt_frag_shader_binary);
+        sd.fragment_data = forward_rt_frag_shader_binary;
+        spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
+        spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
+        spec_data.push_back(opt.shadow_rays);
+        spec_data.push_back(opt.reflection_rays);
+    }
+    else
+    {
+        sd.fragment_bytes = sizeof(forward_frag_shader_binary);
+        sd.fragment_data = forward_frag_shader_binary;
+    }
+    sd.fragment_specialization.mapEntryCount = spec_entries.size();
+    sd.fragment_specialization.pMapEntries = spec_entries.data();
+    sd.fragment_specialization.dataSize = spec_data.size() * sizeof(uint32_t);
+    sd.fragment_specialization.pData = spec_data.data();
+
+    std::vector<render_target*> targets;
+    if(color_target) targets.push_back(color_target);
+    if(depth_target) targets.push_back(depth_target);
+
+    graphics_pipeline::params gfx_params(targets);
+
+    if(color_target)
+    {
+        gfx_params.blend_states[0] = {
+            VK_TRUE,
+            VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            VK_BLEND_OP_ADD,
+            VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ZERO,
+            VK_BLEND_OP_ADD,
+            VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|
+            VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
+        };
+    }
+    std::vector<VkDescriptorSetLayoutBinding> bindings = s.get_bindings();
+    bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    bindings.push_back({10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+
+    if(!background)
+    {
+        gfx_params.attachments[0].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+        gfx_params.attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    }
+    gfx_params.attachments[1].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+    gfx_params.attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+
+    gfx.init(
+        gfx_params,
+        sd,
+        ctx.get_image_count(), 
+        bindings,
+        sizeof(push_constants)
+    );
+}
+
+void do_shading_pass(
+    uint32_t image_index,
+    VkCommandBuffer buf,
+    const scene& s,
+    graphics_pipeline& gfx,
+    bool background
+){
+    gfx.begin_render_pass(buf, image_index);
+    gfx.bind(buf, image_index);
+
+    push_constants pc = {0, 0};
+    std::vector<size_t> transparents;
+    for(size_t j = 0; j < s.get_instance_count(); ++j)
+    {
+        if(s.is_instance_background(j) != background)
+            continue;
+
+        if(s.is_instance_visible(j))
+        {
+            if(s.get_instance_material(j)->transmittance == 0.0f)
+            {
+                pc.instance_id = j;
+                gfx.push_constants(buf, &pc);
+                s.draw_instance(buf, j);
+            }
+            else
+            {
+                transparents.push_back(j);
+            }
+        }
+    }
+
+    for(size_t j: transparents)
+    {
+        pc.instance_id = j;
+        gfx.push_constants(buf, &pc);
+        s.draw_instance(buf, j);
+    }
+
+    gfx.end_render_pass(buf);
+}
+
 }
 
 forward_render_stage::forward_render_stage(
@@ -24,7 +143,7 @@ forward_render_stage::forward_render_stage(
     const scene& s,
     entity cam_id,
     const options& opt
-):  render_stage(ctx), depth_pre_pass(ctx), gfx(ctx), opt(opt),
+):  render_stage(ctx), depth_pre_pass(ctx), background_gfx(ctx), foreground_gfx(ctx), opt(opt),
     stage_timer(ctx, "forward_render_stage"),
     cam_id(cam_id),
     brdf_integration(ctx, get_readonly_path("data/brdf_integration.ktx")),
@@ -59,78 +178,21 @@ forward_render_stage::forward_render_stage(
         );
     }
 
-    { // Shading pipeline
-        shader_data sd;
-
-        sd.vertex_bytes = sizeof(forward_vert_shader_binary);
-        sd.vertex_data = forward_vert_shader_binary;
-        auto spec_entries = s.get_specialization_entries();
-        auto spec_data = s.get_specialization_data();
-
-        if(opt.ray_tracing)
-        {
-            sd.fragment_bytes = sizeof(forward_rt_frag_shader_binary);
-            sd.fragment_data = forward_rt_frag_shader_binary;
-            spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
-            spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
-            spec_data.push_back(opt.shadow_rays);
-            spec_data.push_back(opt.reflection_rays);
-        }
-        else
-        {
-            sd.fragment_bytes = sizeof(forward_frag_shader_binary);
-            sd.fragment_data = forward_frag_shader_binary;
-        }
-        sd.fragment_specialization.mapEntryCount = spec_entries.size();
-        sd.fragment_specialization.pMapEntries = spec_entries.data();
-        sd.fragment_specialization.dataSize = spec_data.size() * sizeof(uint32_t);
-        sd.fragment_specialization.pData = spec_data.data();
-
-        std::vector<render_target*> targets;
-        if(color_target) targets.push_back(color_target);
-        if(depth_target) targets.push_back(depth_target);
-
-        graphics_pipeline::params gfx_params(targets);
-
-        if(color_target)
-        {
-            gfx_params.blend_states[0] = {
-                VK_TRUE,
-                VK_BLEND_FACTOR_ONE,
-                VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                VK_BLEND_OP_ADD,
-                VK_BLEND_FACTOR_ONE,
-                VK_BLEND_FACTOR_ZERO,
-                VK_BLEND_OP_ADD,
-                VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|
-                VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
-            };
-        }
-        std::vector<VkDescriptorSetLayoutBinding> bindings = s.get_bindings();
-        bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
-        bindings.push_back({10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
-
-        gfx_params.attachments[1].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
-        gfx_params.attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-
-        gfx.init(
-            gfx_params,
-            sd,
-            ctx.get_image_count(), 
-            bindings,
-            sizeof(push_constants)
-        );
-    }
-
-    push_constants pc = {0, 0};
+    init_shading_pipeline(false, background_gfx, ctx, color_target, depth_target, s, opt, true);
+    init_shading_pipeline(opt.ray_tracing, foreground_gfx, ctx, color_target, depth_target, s, opt, false);
 
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
     {
         // Assign descriptors
-        s.set_descriptors(gfx, i);
         s.set_descriptors(depth_pre_pass, i);
-        gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
-        gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+
+        s.set_descriptors(background_gfx, i);
+        background_gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
+        background_gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+
+        s.set_descriptors(foreground_gfx, i);
+        foreground_gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
+        foreground_gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
 
         // Record command buffer
         VkCommandBuffer buf = graphics_commands();
@@ -139,6 +201,8 @@ forward_render_stage::forward_render_stage(
         // Pre-pass to prevent overdraw (it's ridiculously expensive with RT)
         depth_pre_pass.begin_render_pass(buf, i);
         depth_pre_pass.bind(buf, i);
+
+        push_constants pc = {0, 0};
         for(size_t j = 0; j < s.get_instance_count(); ++j)
         {
             if(s.is_instance_visible(j))
@@ -153,36 +217,11 @@ forward_render_stage::forward_render_stage(
         }
         depth_pre_pass.end_render_pass(buf);
 
-        // Actual pass
-        gfx.begin_render_pass(buf, i);
-        gfx.bind(buf, i);
+        // Background pass
+        do_shading_pass(i, buf, s, background_gfx, true);
 
-        std::vector<size_t> transparents;
-        for(size_t j = 0; j < s.get_instance_count(); ++j)
-        {
-            if(s.is_instance_visible(j))
-            {
-                if(s.get_instance_material(j)->transmittance == 0.0f)
-                {
-                    pc.instance_id = j;
-                    gfx.push_constants(buf, &pc);
-                    s.draw_instance(buf, j);
-                }
-                else
-                {
-                    transparents.push_back(j);
-                }
-            }
-        }
-
-        for(size_t j: transparents)
-        {
-            pc.instance_id = j;
-            gfx.push_constants(buf, &pc);
-            s.draw_instance(buf, j);
-        }
-
-        gfx.end_render_pass(buf);
+        // Foreground pass
+        do_shading_pass(i, buf, s, foreground_gfx, false);
 
         stage_timer.stop(buf, i);
         use_graphics_commands(buf, i);

@@ -14,6 +14,9 @@ struct options
     bool colormapping = true;
     bool render_subpixels = false;
     bool pixel_transitions = true;
+    bool ray_tracing = true;
+    unsigned shadow_rays = 1;
+    unsigned reflection_rays = 1;
     int display_index = -1;
     std::string mode = "plain";
     std::string gb_color = "atomic-purple";

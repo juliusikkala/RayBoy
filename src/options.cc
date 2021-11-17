@@ -13,6 +13,9 @@ json options::serialize() const
     j["colormapping"] = colormapping;
     j["render_subpixels"] = render_subpixels;
     j["pixel_transitions"] = pixel_transitions;
+    j["ray_tracing"] = ray_tracing;
+    j["shadow_rays"] = shadow_rays;
+    j["reflection_rays"] = reflection_rays;
     j["display_index"] = display_index;
     j["mode"] = mode;
     j["gb_color"] = gb_color;
@@ -44,6 +47,9 @@ bool options::deserialize(const json& j)
         colormapping = j.value("colormapping", true);
         render_subpixels = j.value("render_subpixels", false);
         pixel_transitions = j.value("pixel_transitions", true);
+        ray_tracing = j.value("ray_tracing", true);
+        shadow_rays = j.value("shadow_rays", 1);
+        reflection_rays = j.value("reflection_rays", 1);
         display_index = j.value("display_index", -1);
         mode = j.value("mode", "plain");
         gb_color = j.value("gb_color", "atomic-purple");

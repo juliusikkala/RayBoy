@@ -1,6 +1,7 @@
 #include "game.hh"
 #include "environment_map.hh"
 #include "imgui.h"
+#include "scene.hh"
 #define AUTOSAVE_INTERVAL (60*1000)
 
 namespace
@@ -152,6 +153,11 @@ void game::load_scene(const std::string& name)
     audio_ctx->set_listener(
         ecs_scene.get<transformable>(scene_data.entities["Camera_Orientation"])
     );
+
+    for(const auto& [name, id]: scene_data.entities)
+    {
+        ecs_scene.attach(id, background_entity{});
+    }
 }
 
 bool game::handle_input()
@@ -301,6 +307,9 @@ bool game::handle_input()
             case gui::SET_GB_COLOR:
                 update_gbc_material();
                 break;
+            case gui::SET_RT_OPTION:
+                pipeline.reset();
+                break;
             }
             break;
         }
@@ -402,8 +411,11 @@ void game::create_pipeline()
     else if(opt.mode == "fancy")
     {
         fancy_render_pipeline::options fancy_options = {
-            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples,
-            gfx_ctx->get_device().supports_ray_tracing
+            opt.resolution_scaling,
+            (VkSampleCountFlagBits)opt.msaa_samples,
+            gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
+            opt.shadow_rays,
+            opt.reflection_rays
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
         material* screen_mat = &(*screen_model)[3].mat;

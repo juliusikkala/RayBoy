@@ -18,6 +18,8 @@ public:
         float resolution_scaling = 1.0f;
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
         bool ray_tracing = false;
+        unsigned shadow_rays = 1;
+        unsigned reflection_rays = 1;
     };
 
     fancy_render_pipeline(
