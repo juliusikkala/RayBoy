@@ -10,6 +10,7 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
+    uint disable_rt_reflection; // unused here
 } pc;
 
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
@@ -37,22 +38,13 @@ void main()
     vec3 indirect_diffuse;
     vec3 indirect_specular;
 
-    get_indirect_light(
+    vec3 lighting = get_indirect_light_rt(
         position,
         i.environment_mesh.xyz,
         mat.normal,
         view_dir,
-        mat.roughness,
-        vec2(0), // TODO: Lightmaps
-        indirect_diffuse,
-        indirect_specular
-    );
-
-    vec3 lighting = brdf_indirect(
-        indirect_diffuse,
-        indirect_specular,
-        view_dir,
-        mat
+        mat,
+        vec2(0) // TODO: Lightmaps
     ) + mat.emission;
 
     [[unroll]] for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
@@ -88,4 +80,3 @@ void main()
 
     color = vec4(lighting, alpha);
 }
-

@@ -162,18 +162,21 @@ void get_directional_light_info(
     color = l.color.rgb;
 }
 
-void get_indirect_light(
+vec3 get_indirect_light(
     vec3 pos,
     ivec3 environment_indices,
     vec3 normal,
     vec3 view,
-    float roughness,
-    vec2 lightmap_uv,
-    out vec3 indirect_diffuse,
-    out vec3 indirect_specular
+    in material mat,
+    vec2 lightmap_uv
 ){
-    indirect_diffuse = vec3(0);
-    indirect_specular = vec3(0);
+    vec3 diffuse_attenuation;
+    vec3 specular_attenuation;
+    brdf_indirect(
+        view, mat, diffuse_attenuation, specular_attenuation
+    );
+    vec3 indirect_diffuse = vec3(0);
+    vec3 indirect_specular = vec3(0);
 
     if(environment_indices.x != -1)
     {
@@ -183,18 +186,58 @@ void get_indirect_light(
             dot(normal, view), 0.0f
         ) * normal - view;
 
-        float lod = roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
-        indirect_specular = textureLod(cube_textures[nonuniformEXT(environment_indices.x)], ref_dir, lod).rgb;
+        float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
+        indirect_specular = specular_attenuation * textureLod(cube_textures[nonuniformEXT(environment_indices.x)], ref_dir, lod).rgb;
     }
 
     if(environment_indices.y != -1)
-        indirect_diffuse = texture(cube_textures[nonuniformEXT(environment_indices.y)], normal).rgb;
+    {
+        indirect_diffuse = diffuse_attenuation * texture(cube_textures[nonuniformEXT(environment_indices.y)], normal).rgb;
+    }
 
     if(environment_indices.z != -1)
-        indirect_diffuse = texture(
+        indirect_diffuse = diffuse_attenuation * texture(
             textures[nonuniformEXT(environment_indices.z)],
             lightmap_uv
         ).rgb;
+    return indirect_diffuse + indirect_specular;
+}
+
+vec3 shade_point(
+    vec3 position,
+    vec3 view_dir,
+    vec3 surface_normal,
+    ivec3 environment_indices,
+    in material mat
+){
+    vec3 lighting = get_indirect_light(
+        position,
+        environment_indices,
+        mat.normal,
+        view_dir,
+        mat,
+        vec2(0)
+    ) + mat.emission;
+
+    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_point_light_info(point_lights.array[i], position, light_dir, color);
+        // Hack to prevent normal map weirdness at grazing angles
+        float terminator = smoothstep(-0.05, 0.0, dot(surface_normal, light_dir));
+        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
+    }
+
+    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_directional_light_info(directional_lights.array[i], light_dir, color);
+        float terminator = smoothstep(-0.05, 0.0, dot(surface_normal, light_dir));
+        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
+    }
+    return lighting;
 }
 
 #endif

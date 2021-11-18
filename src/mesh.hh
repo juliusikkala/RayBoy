@@ -11,9 +11,9 @@ class mesh
 public:
     struct vertex
     {
-        pvec3 pos;
-        pvec3 normal;
-        pvec2 uv;
+        pvec4 pos;
+        pvec4 normal;
+        pvec4 uv;
         pvec4 tangent;
     };
 

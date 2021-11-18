@@ -13,6 +13,7 @@ struct push_constants
 {
     uint32_t instance_id;
     uint32_t camera_id;
+    uint32_t disable_rt_reflection;
 };
 
 void init_shading_pipeline(
@@ -32,7 +33,7 @@ void init_shading_pipeline(
     auto spec_entries = s.get_specialization_entries();
     auto spec_data = s.get_specialization_data();
 
-    if(opt.ray_tracing)
+    if(ray_tracing)
     {
         sd.fragment_bytes = sizeof(forward_rt_frag_shader_binary);
         sd.fragment_data = forward_rt_frag_shader_binary;
@@ -102,7 +103,7 @@ void do_shading_pass(
     gfx.begin_render_pass(buf, image_index);
     gfx.bind(buf, image_index);
 
-    push_constants pc = {0, 0};
+    push_constants pc = {0, 0, 0};
     std::vector<size_t> transparents;
     for(size_t j = 0; j < s.get_instance_count(); ++j)
     {
@@ -114,6 +115,7 @@ void do_shading_pass(
             if(s.get_instance_material(j)->transmittance == 0.0f)
             {
                 pc.instance_id = j;
+                pc.disable_rt_reflection = s.is_instance_rt_reflection_disabled(j);
                 gfx.push_constants(buf, &pc);
                 s.draw_instance(buf, j);
             }
@@ -127,6 +129,7 @@ void do_shading_pass(
     for(size_t j: transparents)
     {
         pc.instance_id = j;
+        pc.disable_rt_reflection = s.is_instance_rt_reflection_disabled(j);
         gfx.push_constants(buf, &pc);
         s.draw_instance(buf, j);
     }
@@ -202,7 +205,7 @@ forward_render_stage::forward_render_stage(
         depth_pre_pass.begin_render_pass(buf, i);
         depth_pre_pass.bind(buf, i);
 
-        push_constants pc = {0, 0};
+        push_constants pc = {0, 0, 0};
         for(size_t j = 0; j < s.get_instance_count(); ++j)
         {
             if(s.is_instance_visible(j))

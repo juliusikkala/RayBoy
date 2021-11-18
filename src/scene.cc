@@ -119,6 +119,7 @@ void scene::update(uint32_t image_index)
     instance_transforms.clear();
     instance_visible.clear();
     instance_background.clear();
+    instance_rt_reflection_disabled.clear();
     instance_material.clear();
 
     e->foreach([&](entity id, environment_map& e) {
@@ -131,7 +132,7 @@ void scene::update(uint32_t image_index)
 
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
-        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner, background_entity* bg) {
+        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner, background_entity* bg, disable_rt_reflection* drt) {
             mat4 mat = t.get_global_transform();
             mat4 inv = inverseTranspose(mat);
             for(const model::vertex_group& group: m)
@@ -181,6 +182,7 @@ void scene::update(uint32_t image_index)
                 // tracing!
                 instance_visible.push_back(inner == nullptr);
                 instance_background.push_back(bg != nullptr);
+                instance_rt_reflection_disabled.push_back(drt != nullptr);
                 instance_material.push_back(&group.mat);
             }
         });
@@ -247,7 +249,7 @@ void scene::update(uint32_t image_index)
                 if(!instance_visible[i])
                     continue;
                 data[j] = {
-                    {}, (uint32_t)i, instance_material[i]->potentially_transparent() ? 2 : 1, 0,
+                    {}, (uint32_t)i, instance_material[i]->potentially_transparent() ? 2u : 1u, 0,
                     VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
                     instance_meshes[i]->get_blas_address()
                 };
@@ -333,7 +335,7 @@ std::vector<VkSpecializationMapEntry> scene::get_specialization_entries() const
 }
 std::vector<uint32_t> scene::get_specialization_data() const
 {
-    return {get_point_light_count(), get_directional_light_count()};
+    return {(uint32_t)get_point_light_count(), (uint32_t)get_directional_light_count()};
 }
 
 void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
@@ -377,6 +379,11 @@ bool scene::is_instance_visible(size_t instance_id) const
 bool scene::is_instance_background(size_t instance_id) const
 {
     return instance_background[instance_id];
+}
+
+bool scene::is_instance_rt_reflection_disabled(size_t instance_id) const
+{
+    return instance_rt_reflection_disabled[instance_id];
 }
 
 const material* scene::get_instance_material(size_t instance_id) const

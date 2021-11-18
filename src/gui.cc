@@ -211,11 +211,11 @@ void gui::update()
                             {"Off", 0},
                             {"Lowest (1 ray, sharp reflections only)", 1},
                             {"Low (2 rays, all reflections, very noisy)", 2},
-                            {"Medium (4 rays, all reflections, noisy)", 4},
-                            {"High (8 rays, all reflections, slightly noisy)", 8},
-                            {"Highest (16 rays, all reflections)", 16},
-                            {"Lagfest (32 rays, all reflections)", 32},
-                            {"Bullshot mode (64 rays, all reflections)", 64}
+                            {"Medium (4 rays, all reflections, very noisy)", 4},
+                            {"High (8 rays, all reflections, very noisy)", 8},
+                            {"Highest (16 rays, all reflections, very noisy)", 16},
+                            {"Lagfest (32 rays, all reflections, noisy)", 32},
+                            {"Bullshot mode (64 rays, all reflections, slightly noisy)", 64}
                         };
                         for(auto [name, value]: reflection_options)
                         {

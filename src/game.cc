@@ -110,6 +110,7 @@ void game::load_common_assets()
         true
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
+    ecs_scene.attach(console_data.entities["Screen"], disable_rt_reflection{});
     update_gbc_material();
     for(const auto& [name, id]: console_data.entities)
     {

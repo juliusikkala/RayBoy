@@ -533,7 +533,7 @@ gltf_data load_gltf(
 
             std::vector<mesh::vertex> vertices(position.size());
             for(size_t i = 0; i < position.size(); ++i)
-                vertices[i] = {position[i], normal[i], texcoord[i], tangent[i]};
+                vertices[i] = {pvec4(position[i], 0), pvec4(normal[i], 0), pvec4(texcoord[i], 0, 0), tangent[i]};
 
             material mat;
             if(p.material >= 0)

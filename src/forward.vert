@@ -18,6 +18,7 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
+    uint disable_rt_reflection; // unused here
 } pc;
 
 void main()

@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
 
 #include "scene.glsl"
 
@@ -8,6 +9,7 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
+    uint disable_rt_reflection; // unused here
 } pc;
 
 layout(location = 0) in vec3 position;
@@ -27,45 +29,7 @@ void main()
 
     material mat = sample_material(i.material, gl_FrontFacing, uv, normal, tangent, bitangent);
 
-    vec3 indirect_diffuse;
-    vec3 indirect_specular;
-
-    get_indirect_light(
-        position,
-        i.environment_mesh.xyz,
-        mat.normal,
-        view_dir,
-        mat.roughness,
-        vec2(0), // TODO: Lightmaps
-        indirect_diffuse,
-        indirect_specular
-    );
-
-    vec3 lighting = brdf_indirect(
-        indirect_diffuse,
-        indirect_specular,
-        view_dir,
-        mat
-    ) + mat.emission;
-
-    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
-    {
-        vec3 light_dir;
-        vec3 color;
-        get_point_light_info(point_lights.array[i], position, light_dir, color);
-        // Hack to prevent normal map weirdness at grazing angles
-        float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
-    }
-
-    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
-    {
-        vec3 light_dir;
-        vec3 color;
-        get_directional_light_info(directional_lights.array[i], light_dir, color);
-        float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
-    }
+    vec3 lighting = shade_point(position, view_dir, normal, i.environment_mesh.xyz, mat);
 
     float alpha = 1.0f;
 
