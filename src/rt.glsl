@@ -29,7 +29,7 @@ struct vertex_data
 {
     vec3 pos;
     vec3 normal;
-    vec2 uv;
+    vec4 uv;
     vec3 tangent;
     vec3 bitangent;
 };
@@ -58,7 +58,7 @@ vertex_data get_vertex_data(uint instance_index, uint primitive, vec2 barycentri
     vertex_data vd;
     vd.pos = vec3(i.model_to_world * vec4(model_pos, 1));
     vd.normal = normalize(mat3(i.model_to_world) * model_normal);
-    vd.uv = model_uv.xy;
+    vd.uv = model_uv;
     vd.tangent = normalize(mat3(i.model_to_world) * model_tangent.xyz);
     vd.bitangent = normalize(cross(vd.normal, vd.tangent) * model_tangent.w);
 
@@ -142,12 +142,12 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit)
         material mat = sample_material(
             i.material,
             true,
-            vd.uv,
+            vd.uv.xy,
             vd.normal,
             vd.tangent,
             vd.bitangent
         );
-        color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, mat);
+        color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
     }
 
     return color;
@@ -239,7 +239,7 @@ vec3 get_indirect_light_rt(
     if(environment_indices.x != -1)
     {
         float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
-        indirect_specular = specular_attenuation * textureLod(cube_textures[nonuniformEXT(environment_indices.x)], ref_dir, lod).rgb;
+        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
     }
 
     if(REFLECTION_RAY_COUNT == 1)
@@ -277,7 +277,7 @@ vec3 get_indirect_light_rt(
                 bool hit = false;
                 vec3 refl_color = reflection_ray(pos, dir, 0.1, hit);
                 if(!hit)
-                    refl_color = textureLod(cube_textures[nonuniformEXT(environment_indices.x)], dir, 0).rgb;
+                    refl_color = sample_cubemap(environment_indices.x, dir, 0);
                 // Yeah, the clamping is arbitrary. It removes some fireflies.
                 indirect_specular += clamp(refl_color * ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(5));
             }
@@ -287,7 +287,7 @@ vec3 get_indirect_light_rt(
 
     if(environment_indices.y != -1)
     {
-        indirect_diffuse = diffuse_attenuation * texture(cube_textures[nonuniformEXT(environment_indices.y)], normal).rgb;
+        indirect_diffuse = diffuse_attenuation * sample_cubemap(environment_indices.y, normal, 0);
     }
 
     if(environment_indices.z != -1)

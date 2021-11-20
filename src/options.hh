@@ -20,6 +20,7 @@ struct options
     int display_index = -1;
     std::string mode = "plain";
     std::string gb_color = "atomic-purple";
+    std::string scene = "white_room";
 
     json serialize() const;
     bool deserialize(const json& j);

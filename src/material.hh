@@ -30,6 +30,7 @@ struct material
     float transmittance = 0.0f;
 
     const environment_map* envmap = nullptr;
+    sampler_tex lightmap = {nullptr, nullptr};
 };
 
 namespace std

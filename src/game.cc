@@ -8,6 +8,7 @@ namespace
 {
 
 struct console_entity {};
+struct scene_entity {};
 
 float deadzone(float value, float dz)
 {
@@ -88,6 +89,9 @@ game::game(const char* initial_rom)
 
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     save_timer = SDL_AddTimer(AUTOSAVE_INTERVAL, autosave, this);
+
+    load_common_assets();
+    load_scene(opt.scene);
 }
 
 game::~game()
@@ -128,29 +132,60 @@ void game::load_scene(const std::string& name)
     // Just nuke the pipeline and ensure all things that could use assets
     // from the current scene are destroyed.
     pipeline.reset();
-    gfx_ctx->sync_flush();
-
     if(gbc) gbc->set_parent(nullptr);
     scene_data.remove(ecs_scene);
+    gfx_ctx->sync_flush();
+
     scene_data = load_gltf(
         *gfx_ctx,
         get_readonly_path("data/"+name+".glb"),
         ecs_scene
     );
 
-    scene_data.textures.emplace_back(new texture(*gfx_ctx, get_readonly_path("data/"+name+"_radiance.ktx")));
-    scene_data.textures.emplace_back(new texture(*gfx_ctx, get_readonly_path("data/"+name+"_irradiance.ktx")));
-    entity envmap_id = ecs_scene.add(environment_map{
-        scene_data.textures[scene_data.textures.size()-2].get(),
-        scene_data.textures[scene_data.textures.size()-1].get()
-    });
-    scene_data.entities["ENVMAP"] = envmap_id;
-    environment_map* envmap = ecs_scene.get<environment_map>(envmap_id);
-    // Use the scene envmap for the console (and only the console, as the scene
-    // itself should be lightmapped instead.)
-    ecs_scene([&](entity id, console_entity&, model& m){
+    std::string radiance_path = get_readonly_path("data/"+name+"_radiance.ktx");
+    std::string irradiance_path = get_readonly_path("data/"+name+"_irradiance.ktx");
+    std::string lightmap_path = get_readonly_path("data/"+name+"_lightmap.hdr");
+
+    texture* radiance_ptr = nullptr;
+    texture* irradiance_ptr = nullptr;
+    environment_map* envmap = nullptr;
+    if(fs::exists(irradiance_path) && fs::exists(radiance_path))
+    {
+        radiance_ptr = new texture(*gfx_ctx, radiance_path);
+        irradiance_ptr = new texture(*gfx_ctx, irradiance_path);
+        scene_data.textures.emplace_back(radiance_ptr);
+        scene_data.textures.emplace_back(irradiance_ptr);
+        entity envmap_id = ecs_scene.add(environment_map{
+            radiance_ptr, irradiance_ptr
+        });
+        scene_data.entities["ENVMAP"] = envmap_id;
+        envmap = ecs_scene.get<environment_map>(envmap_id);
+    }
+
+    texture* lightmap_ptr = nullptr;
+    if(fs::exists(lightmap_path))
+    {
+        lightmap_ptr = new texture(*gfx_ctx, lightmap_path);
+        scene_data.textures.emplace_back(lightmap_ptr);
+    }
+
+    for(const auto& [name, id]: scene_data.entities)
+    {
+        ecs_scene.attach(id, scene_entity{});
+    }
+
+    ecs_scene([&](entity id, console_entity* ce, scene_entity* se, model& m){
         for(auto& vg: m)
+        {
             vg.mat.envmap = envmap;
+            if(se)
+            {
+                vg.mat.lightmap = {
+                    scene_data.samplers.back().get(),
+                    lightmap_ptr
+                };
+            }
+        }
     });
 
     cam_transform = ecs_scene.get<transformable>(scene_data.entities["Camera"]);
@@ -310,6 +345,9 @@ bool game::handle_input()
                 break;
             case gui::SET_RT_OPTION:
                 pipeline.reset();
+                break;
+            case gui::SET_SCENE:
+                load_scene(opt.scene);
                 break;
             }
             break;

@@ -402,6 +402,8 @@ void transformable_orphan_handler::handle(
     // If the parent has been removed, the children are removed too.
     ctx([&](entity id, transformable& t){
         if(t.get_parent() == e.data)
+        {
             ctx.remove(id);
+        }
     });
 }

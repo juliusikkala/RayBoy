@@ -153,6 +153,7 @@ bool scene::update(uint32_t image_index)
                     inst.environment_mesh.x = eit->second;
                     inst.environment_mesh.y = eit->second+1;
                 }
+                inst.environment_mesh.z = get_st_index(group.mat.lightmap, outdated);
 
                 auto mesh_it = mesh_indices.find(group.mesh);
                 if(mesh_it == mesh_indices.end())
@@ -349,7 +350,8 @@ void scene::refresh_descriptors(uint32_t image_index)
                 group.mat.color_texture,
                 group.mat.metallic_roughness_texture,
                 group.mat.normal_texture,
-                group.mat.emission_texture
+                group.mat.emission_texture,
+                group.mat.lightmap
             }) {
                 if(st.first == nullptr || st.second == nullptr)
                     continue;

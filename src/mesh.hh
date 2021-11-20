@@ -13,6 +13,7 @@ public:
     {
         pvec4 pos;
         pvec4 normal;
+        // xy: primary texture coordinates, zw: lightmap texture coordinates
         pvec4 uv;
         pvec4 tangent;
     };
@@ -42,7 +43,7 @@ public:
     static constexpr VkVertexInputAttributeDescription attributes[] = {
         {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertex, pos)},
         {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertex, normal)},
-        {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, uv)},
+        {2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vertex, uv)},
         {3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vertex, tangent)}
     };
 

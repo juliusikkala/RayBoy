@@ -20,7 +20,7 @@ layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
-layout(location = 2) in vec2 uv;
+layout(location = 2) in vec4 uv;
 layout(location = 3) in vec3 tangent;
 layout(location = 4) in vec3 bitangent;
 
@@ -33,7 +33,7 @@ void main()
 
     vec3 view_dir = normalize(cam.origin.xyz - position);
 
-    material mat = sample_material(i.material, gl_FrontFacing, uv, normal, tangent, bitangent);
+    material mat = sample_material(i.material, gl_FrontFacing, uv.xy, normal, tangent, bitangent);
 
     vec3 indirect_diffuse;
     vec3 indirect_specular;
@@ -44,7 +44,7 @@ void main()
         mat.normal,
         view_dir,
         mat,
-        vec2(0) // TODO: Lightmaps
+        uv.zw
     ) + mat.emission;
 
     [[unroll]] for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
@@ -73,7 +73,7 @@ void main()
 
     if(mat.transmittance.r > 0.0f)
     {
-        float cos_d = clamp(dot(view_dir, normal), 0.0f, 1.0f);
+        float cos_d = abs(dot(view_dir, normal));
         float fresnel = fresnel_schlick(cos_d, mat.f0);
         alpha = mix(1.0f, fresnel, mat.transmittance.r);
     }

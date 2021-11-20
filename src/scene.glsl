@@ -123,7 +123,7 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
     }
 
     mat.emission *= mat.color.a;
-    mat.transmittance = mat.color.rgb * spec.emission_transmittance_factors.a;
+    mat.transmittance = vec3(spec.emission_transmittance_factors.a);
 
     return mat;
 }
@@ -162,6 +162,11 @@ void get_directional_light_info(
     color = l.color.rgb;
 }
 
+vec3 sample_cubemap(int ind, vec3 dir, float lod)
+{
+    return textureLod(cube_textures[nonuniformEXT(ind)], vec3(dir.x, dir.y, -dir.z), lod).rgb;
+}
+
 vec3 get_indirect_light(
     vec3 pos,
     ivec3 environment_indices,
@@ -187,19 +192,21 @@ vec3 get_indirect_light(
         ) * normal - view;
 
         float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
-        indirect_specular = specular_attenuation * textureLod(cube_textures[nonuniformEXT(environment_indices.x)], ref_dir, lod).rgb;
+        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
     }
 
     if(environment_indices.y != -1)
     {
-        indirect_diffuse = diffuse_attenuation * texture(cube_textures[nonuniformEXT(environment_indices.y)], normal).rgb;
+        indirect_diffuse = diffuse_attenuation * sample_cubemap(environment_indices.y, normal, 0);
     }
 
     if(environment_indices.z != -1)
+    {
         indirect_diffuse = diffuse_attenuation * texture(
             textures[nonuniformEXT(environment_indices.z)],
             lightmap_uv
         ).rgb;
+    }
     return indirect_diffuse + indirect_specular;
 }
 
@@ -208,6 +215,7 @@ vec3 shade_point(
     vec3 view_dir,
     vec3 surface_normal,
     ivec3 environment_indices,
+    vec2 lightmap_uv,
     in material mat
 ){
     vec3 lighting = get_indirect_light(
@@ -216,7 +224,7 @@ vec3 shade_point(
         mat.normal,
         view_dir,
         mat,
-        vec2(0)
+        lightmap_uv
     ) + mat.emission;
 
     for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)

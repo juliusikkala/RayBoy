@@ -261,6 +261,30 @@ void gui::update()
                     }
                     ImGui::EndMenu();
                 }
+
+                if(ImGui::BeginMenu("Scene"))
+                {
+                    static constexpr struct {
+                        const char* name;
+                        const char* id;
+                    } scene_options[] = {
+                        {"White room", "white_room"},
+                        {"Undercover", "undercover"}
+                    };
+
+                    for(auto [name, id]: scene_options)
+                    {
+                        if(ImGui::MenuItem(name, NULL, opts->scene == id))
+                        {
+                            opts->scene = id;
+                            SDL_Event e;
+                            e.type = SDL_USEREVENT;
+                            e.user.code = SET_SCENE;
+                            SDL_PushEvent(&e);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
             }
 
             if(ImGui::BeginMenu("Resolution"))

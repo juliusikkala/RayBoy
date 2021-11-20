@@ -5,12 +5,12 @@
 
 layout(location = 0) in vec3 model_pos;
 layout(location = 1) in vec3 model_normal;
-layout(location = 2) in vec2 model_uv;
+layout(location = 2) in vec4 model_uv;
 layout(location = 3) in vec4 model_tangent;
 
 layout(location = 0) out vec3 world_position;
 layout(location = 1) out vec3 world_normal;
-layout(location = 2) out vec2 world_uv;
+layout(location = 2) out vec4 world_uv;
 layout(location = 3) out vec3 world_tangent;
 layout(location = 4) out vec3 world_bitangent;
 

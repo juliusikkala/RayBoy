@@ -18,7 +18,6 @@ struct gltf_data
     std::vector<std::unique_ptr<mesh>> meshes;
     std::vector<std::unique_ptr<animation_pool>> animation_pools;
     std::unordered_map<std::string, entity> entities;
-    entity scene;
 
     void remove(ecs& e);
 };

@@ -11,7 +11,6 @@ void gltf_data::remove(ecs& e)
 {
     for(const auto& pair: entities)
         e.remove(pair.second);
-    e.remove(scene);
     textures.clear();
     samplers.clear();
     meshes.clear();
@@ -509,6 +508,7 @@ gltf_data load_gltf(
             std::vector<vec3> position;
             std::vector<vec3> normal;
             std::vector<vec2> texcoord;
+            std::vector<vec2> lm_texcoord;
             std::vector<vec4> tangent;
 
             for(const auto& pair: p.attributes)
@@ -519,17 +519,25 @@ gltf_data load_gltf(
                     normal = read_accessor<vec3>(gltf_model, pair.second);
                 else if(pair.first == "TEXCOORD_0")
                     texcoord = read_accessor<vec2>(gltf_model, pair.second);
+                else if(pair.first == "TEXCOORD_1")
+                    lm_texcoord = read_accessor<vec2>(gltf_model, pair.second);
                 else if(pair.first == "TANGENT")
                     tangent = read_accessor<vec4>(gltf_model, pair.second);
             }
 
             normal.resize(position.size());
             texcoord.resize(position.size());
+            lm_texcoord.resize(position.size());
             tangent.resize(position.size());
 
             std::vector<mesh::vertex> vertices(position.size());
             for(size_t i = 0; i < position.size(); ++i)
-                vertices[i] = {pvec4(position[i], 0), pvec4(normal[i], 0), pvec4(texcoord[i], 0, 0), tangent[i]};
+                vertices[i] = {
+                    pvec4(position[i], 0),
+                    pvec4(normal[i], 0),
+                    pvec4(texcoord[i], lm_texcoord[i].x, 1.0-lm_texcoord[i].y),
+                    tangent[i]
+                };
 
             material mat;
             if(p.material >= 0)

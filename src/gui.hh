@@ -22,7 +22,8 @@ public:
         SET_ANTIALIASING,
         SET_RENDERING_MODE,
         SET_GB_COLOR,
-        SET_RT_OPTION
+        SET_RT_OPTION,
+        SET_SCENE
     };
 
     void handle_event(const SDL_Event& event);
