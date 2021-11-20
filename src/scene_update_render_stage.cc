@@ -10,6 +10,8 @@ scene_update_render_stage::scene_update_render_stage(
 {
     for(size_t i = 0; i < ctx.get_image_count(); ++i)
     {
+        s.update(i);
+
         // Record command buffers
         VkCommandBuffer cmd = graphics_commands();
         stage_timer.start(cmd, i);

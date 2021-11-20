@@ -106,16 +106,21 @@ void game::load_common_assets()
     console_data = load_gltf(
         *gfx_ctx,
         get_readonly_path("data/gbcv2_contraband_asset.glb"),
-        ecs_scene,
-        true
+        ecs_scene
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
-    ecs_scene.attach(console_data.entities["Screen"], disable_rt_reflection{});
     update_gbc_material();
     for(const auto& [name, id]: console_data.entities)
     {
         ecs_scene.attach(id, console_entity{});
+        ecs_scene.attach(id, ray_traced{});
+        if(!ecs_scene.has<outer_layer>(id))
+            ecs_scene.remove<visible>(id);
     }
+    ecs_scene.attach(
+        console_data.entities["Screen"],
+        ray_traced{true, false, false}
+    );
 }
 
 void game::load_scene(const std::string& name)
@@ -154,11 +159,6 @@ void game::load_scene(const std::string& name)
     audio_ctx->set_listener(
         ecs_scene.get<transformable>(scene_data.entities["Camera_Orientation"])
     );
-
-    for(const auto& [name, id]: scene_data.entities)
-    {
-        ecs_scene.attach(id, background_entity{});
-    }
 }
 
 bool game::handle_input()
@@ -196,7 +196,7 @@ bool game::handle_input()
 
                 ray next_ray = cam->get_view_ray(next_uv, 0.0f);
                 ray prev_ray = cam->get_view_ray(prev_uv, 0.0f);
-                
+
                 vec3 delta =
                     next_ray.dir/next_ray.dir.z-
                     prev_ray.dir/prev_ray.dir.z;

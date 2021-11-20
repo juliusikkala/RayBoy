@@ -7,6 +7,7 @@
 #include "environment_map.hh"
 #include "gltf.hh"
 #include "error.hh"
+#include <initializer_list>
 
 namespace
 {
@@ -92,13 +93,16 @@ scene::scene(context& ctx, ecs& e, bool ray_tracing, size_t max_entries, size_t 
 {
     if(ray_tracing)
         init_rt();
+    ds_info.resize(ctx.get_image_count());
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
-        update(i);
+        refresh_descriptors(i);
 }
 
-void scene::update(uint32_t image_index)
+bool scene::update(uint32_t image_index)
 {
     size_t instance_count = 0;
+    bool outdated = false;
+
     e->foreach([&](entity id, model& m) { instance_count += m.group_count(); });
     check_error(
         instance_count + e->count<point_light>() +
@@ -106,37 +110,17 @@ void scene::update(uint32_t image_index)
         "Too many entities in scene!"
     );
 
-    mesh_indices.clear();
-    st_pairs.clear();
-    envmap_indices.clear();
-    textures.clear();
-    samplers.clear();
-    cubemap_textures.clear();
-    cubemap_samplers.clear();
-    vertex_buffers.clear();
-    index_buffers.clear();
-    instance_meshes.clear();
-    instance_transforms.clear();
-    instance_visible.clear();
-    instance_background.clear();
-    instance_rt_reflection_disabled.clear();
-    instance_material.clear();
-
-    e->foreach([&](entity id, environment_map& e) {
-        envmap_indices[&e] = cubemap_textures.size();
-        cubemap_textures.push_back(e.get_radiance()->get_image_view(image_index));
-        cubemap_textures.push_back(e.get_irradiance()->get_image_view(image_index));
-        cubemap_samplers.push_back(radiance_sampler.get());
-        cubemap_samplers.push_back(irradiance_sampler.get());
-    });
-
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
-        e->foreach([&](entity id, transformable& t, model& m, inner_node* inner, background_entity* bg, disable_rt_reflection* drt) {
+        e->foreach([&](entity id, transformable& t, model& m, visible&) {
             mat4 mat = t.get_global_transform();
             mat4 inv = inverseTranspose(mat);
+            std::vector<uint32_t>& instances = entity_instances[id];
+            instances.clear();
+
             for(const model::vertex_group& group: m)
             {
+                instances.push_back(i);
                 gpu_instance& inst = data[i++];
                 inst.model_to_world = mat;
                 inst.normal_to_world = inv;
@@ -152,48 +136,34 @@ void scene::update(uint32_t image_index)
                     group.mat.transmittance
                 );
                 inst.material.textures = {
-                    get_st_index(group.mat.color_texture, image_index),
-                    get_st_index(group.mat.metallic_roughness_texture, image_index),
-                    get_st_index(group.mat.normal_texture, image_index),
-                    get_st_index(group.mat.emission_texture, image_index),
+                    get_st_index(group.mat.color_texture, outdated),
+                    get_st_index(group.mat.metallic_roughness_texture, outdated),
+                    get_st_index(group.mat.normal_texture, outdated),
+                    get_st_index(group.mat.emission_texture, outdated),
                 };
                 inst.environment_mesh = ivec4(-1);
-                auto eit = envmap_indices.find(group.mat.envmap);
-                if(eit != envmap_indices.end())
+                if(group.mat.envmap != nullptr)
                 {
+                    auto eit = envmap_indices.find(group.mat.envmap);
+                    if(eit == envmap_indices.end())
+                    {
+                        outdated = true;
+                        return;
+                    }
                     inst.environment_mesh.x = eit->second;
                     inst.environment_mesh.y = eit->second+1;
                 }
 
                 auto mesh_it = mesh_indices.find(group.mesh);
-                if(mesh_it != mesh_indices.end())
-                    inst.environment_mesh.w = mesh_it->second;
-                else
+                if(mesh_it == mesh_indices.end())
                 {
-                    inst.environment_mesh.w = mesh_indices.size();
-                    mesh_indices[group.mesh] = inst.environment_mesh.w;
-                    vertex_buffers.push_back(group.mesh->get_vertex_buffer());
-                    index_buffers.push_back(group.mesh->get_index_buffer());
+                    outdated = true;
+                    return;
                 }
-                instance_meshes.push_back(group.mesh);
-                instance_transforms.push_back(inst.model_to_world);
-                // Rayboy hack: inner parts of the console are marked as such,
-                // and won't be rasterized! They're only visible with ray
-                // tracing!
-                instance_visible.push_back(inner == nullptr);
-                instance_background.push_back(bg != nullptr);
-                instance_rt_reflection_disabled.push_back(drt != nullptr);
-                instance_material.push_back(&group.mat);
+                inst.environment_mesh.w = mesh_it->second;
             }
         });
     });
-
-    textures.resize(max_textures, filler_texture.get_image_view(image_index));
-    samplers.resize(max_textures, filler_sampler.get());
-    cubemap_textures.resize(max_textures, filler_cubemap.get_image_view(image_index));
-    cubemap_samplers.resize(max_textures, filler_sampler.get());
-    vertex_buffers.resize(max_entries, filler_buffer);
-    index_buffers.resize(max_entries, filler_buffer);
 
     point_lights.update<gpu_point_light>(image_index, [&](gpu_point_light* data){
         size_t i = 0;
@@ -242,27 +212,32 @@ void scene::update(uint32_t image_index)
 
     if(ray_tracing)
     {
-        rt_instance_count = 0;
         rt_instances.update<VkAccelerationStructureInstanceKHR>(image_index, [&](VkAccelerationStructureInstanceKHR* data) {
-            for(size_t i = 0, j = 0; i < instance_meshes.size(); ++i)
-            {
-                if(!instance_visible[i])
-                    continue;
-                data[j] = {
-                    {}, (uint32_t)i, instance_material[i]->potentially_transparent() ? 2u : 1u, 0,
-                    VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-                    instance_meshes[i]->get_blas_address()
-                };
-                mat4 t = transpose(instance_transforms[i]);
-                memcpy(
-                    &data[j].transform, &t,
-                    sizeof(data[j].transform)
-                );
-                rt_instance_count++;
-                j++;
-            }
+            rt_instance_count = 0;
+            size_t i = 0;
+            e->foreach([&](entity id, transformable& t, model& m, visible&, ray_traced* rt) {
+                mat4 transform = transpose(t.get_global_transform());
+                for(const model::vertex_group& group: m)
+                {
+                    if(rt)
+                    {
+                        data[rt_instance_count] = {
+                            {}, (uint32_t)i, group.mat.potentially_transparent() ? 2u : 1u, 0,
+                            VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+                            group.mesh->get_blas_address()
+                        };
+                        memcpy(
+                            &data[rt_instance_count].transform, &transform,
+                            sizeof(data[rt_instance_count].transform)
+                        );
+                        rt_instance_count++;
+                    }
+                    i++;
+                }
+            });
         });
     }
+    return !outdated;
 }
 
 void scene::upload(VkCommandBuffer cmd, uint32_t image_index)
@@ -338,8 +313,81 @@ std::vector<uint32_t> scene::get_specialization_data() const
     return {(uint32_t)get_point_light_count(), (uint32_t)get_directional_light_count()};
 }
 
+void scene::refresh_descriptors(uint32_t image_index)
+{
+    std::vector<VkImageView>& textures = ds_info[image_index].textures;
+    std::vector<VkSampler>& samplers = ds_info[image_index].samplers;
+    std::vector<VkImageView>& cubemap_textures = ds_info[image_index].cubemap_textures;
+    std::vector<VkSampler>& cubemap_samplers = ds_info[image_index].cubemap_samplers;
+    std::vector<VkBuffer>& vertex_buffers = ds_info[image_index].vertex_buffers;
+    std::vector<VkBuffer>& index_buffers = ds_info[image_index].index_buffers;
+
+    mesh_indices.clear();
+    st_pairs.clear();
+    envmap_indices.clear();
+
+    textures.clear();
+    samplers.clear();
+    cubemap_textures.clear();
+    cubemap_samplers.clear();
+    vertex_buffers.clear();
+    index_buffers.clear();
+
+    // Add cubemap textures
+    e->foreach([&](entity id, environment_map& e) {
+        envmap_indices[&e] = cubemap_textures.size();
+        cubemap_textures.push_back(e.get_radiance()->get_image_view(image_index));
+        cubemap_textures.push_back(e.get_irradiance()->get_image_view(image_index));
+        cubemap_samplers.push_back(radiance_sampler.get());
+        cubemap_samplers.push_back(irradiance_sampler.get());
+    });
+
+    e->foreach([&](entity id, transformable& t, model& m) {
+        for(const model::vertex_group& group: m)
+        {
+            for(const material::sampler_tex& st: {
+                group.mat.color_texture,
+                group.mat.metallic_roughness_texture,
+                group.mat.normal_texture,
+                group.mat.emission_texture
+            }) {
+                if(st.first == nullptr || st.second == nullptr)
+                    continue;
+                auto it = st_pairs.find(st);
+                if(it == st_pairs.end())
+                {
+                    st_pairs[st] = st_pairs.size();
+                    textures.push_back(st.second->get_image_view(image_index));
+                    samplers.push_back(st.first->get());
+                }
+            }
+
+            auto mesh_it = mesh_indices.find(group.mesh);
+            if(mesh_it == mesh_indices.end())
+            {
+                mesh_indices[group.mesh] = vertex_buffers.size();
+                vertex_buffers.push_back(group.mesh->get_vertex_buffer());
+                index_buffers.push_back(group.mesh->get_index_buffer());
+            }
+        }
+    });
+    textures.resize(max_textures, filler_texture.get_image_view(image_index));
+    samplers.resize(max_textures, filler_sampler.get());
+    cubemap_textures.resize(max_textures, filler_cubemap.get_image_view(image_index));
+    cubemap_samplers.resize(max_textures, filler_sampler.get());
+    vertex_buffers.resize(max_entries, *filler_buffer);
+    index_buffers.resize(max_entries, *filler_buffer);
+}
+
 void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
 {
+    const std::vector<VkImageView>& textures = ds_info[image_index].textures;
+    const std::vector<VkSampler>& samplers = ds_info[image_index].samplers;
+    const std::vector<VkImageView>& cubemap_textures = ds_info[image_index].cubemap_textures;
+    const std::vector<VkSampler>& cubemap_samplers = ds_info[image_index].cubemap_samplers;
+    const std::vector<VkBuffer>& vertex_buffers = ds_info[image_index].vertex_buffers;
+    const std::vector<VkBuffer>& index_buffers = ds_info[image_index].index_buffers;
+
     pipeline.set_descriptor(image_index, 0, {instances[image_index]});
     pipeline.set_descriptor(image_index, 1, {point_lights[image_index]});
     pipeline.set_descriptor(image_index, 2, {directional_lights[image_index]});
@@ -356,11 +404,6 @@ void scene::set_descriptors(gpu_pipeline& pipeline, uint32_t image_index) const
     }
 }
 
-size_t scene::get_instance_count() const
-{
-    return instance_meshes.size();
-}
-
 size_t scene::get_point_light_count() const
 {
     return e->count<point_light>() + e->count<spotlight>();
@@ -371,29 +414,14 @@ size_t scene::get_directional_light_count() const
     return e->count<directional_light>();
 }
 
-bool scene::is_instance_visible(size_t instance_id) const
+int32_t scene::get_entity_instance_id(entity id, uint32_t vg_index) const
 {
-    return instance_visible[instance_id];
-}
+    auto it = entity_instances.find(id);
+    if(it == entity_instances.end()) return -1;
+    const std::vector<uint32_t>& instances = it->second;
 
-bool scene::is_instance_background(size_t instance_id) const
-{
-    return instance_background[instance_id];
-}
-
-bool scene::is_instance_rt_reflection_disabled(size_t instance_id) const
-{
-    return instance_rt_reflection_disabled[instance_id];
-}
-
-const material* scene::get_instance_material(size_t instance_id) const
-{
-    return instance_material[instance_id];
-}
-
-void scene::draw_instance(VkCommandBuffer buf, size_t instance_id) const
-{
-    instance_meshes[instance_id]->draw(buf);
+    if(vg_index >= instances.size()) return -1;
+    return instances[vg_index];
 }
 
 void scene::init_rt()
@@ -546,18 +574,15 @@ void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refre
     vkCmdBuildAccelerationStructuresKHR(cmd, 1, &as_build_info, &range_ptr);
 }
 
-int32_t scene::get_st_index(material::sampler_tex st, uint32_t image_index)
+int32_t scene::get_st_index(material::sampler_tex st, bool& outdated) const
 {
     if(st.first == nullptr || st.second == nullptr)
         return -1;
     auto it = st_pairs.find(st);
     if(it == st_pairs.end())
     {
-        int32_t index = st_pairs.size();
-        st_pairs[st] = index;
-        textures.push_back(st.second->get_image_view(image_index));
-        samplers.push_back(st.first->get());
-        return index;
+        outdated = true;
+        return -1;
     }
     else return it->second;
 }

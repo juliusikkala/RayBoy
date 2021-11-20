@@ -1,5 +1,6 @@
 #include "forward_render_stage.hh"
 #include "io.hh"
+#include "model.hh"
 #include "forward.frag.h"
 #include "forward.vert.h"
 #include "forward_rt.frag.h"
@@ -8,6 +9,12 @@
 
 namespace
 {
+
+struct depth_push_constants
+{
+    uint32_t instance_id;
+    uint32_t camera_id;
+};
 
 struct push_constants
 {
@@ -24,7 +31,7 @@ void init_shading_pipeline(
     render_target* depth_target,
     const scene& s,
     const forward_render_stage::options& opt,
-    bool background
+    bool clear
 ){ // Regular non-RT shading pipeline
     shader_data sd;
 
@@ -76,7 +83,7 @@ void init_shading_pipeline(
     bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     bindings.push_back({10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
-    if(!background)
+    if(!clear)
     {
         gfx_params.attachments[0].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
         gfx_params.attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -93,48 +100,28 @@ void init_shading_pipeline(
     );
 }
 
-void do_shading_pass(
+void draw_entities(
     uint32_t image_index,
     VkCommandBuffer buf,
     const scene& s,
     graphics_pipeline& gfx,
-    bool background
+    bool ray_traced,
+    bool transparent
 ){
-    gfx.begin_render_pass(buf, image_index);
-    gfx.bind(buf, image_index);
-
     push_constants pc = {0, 0, 0};
-    std::vector<size_t> transparents;
-    for(size_t j = 0; j < s.get_instance_count(); ++j)
-    {
-        if(s.is_instance_background(j) != background)
-            continue;
-
-        if(s.is_instance_visible(j))
+    s.get_ecs().foreach([&](entity id, model& m, visible&, struct ray_traced* rt){
+        for(size_t i = 0; i < m.group_count(); ++i)
         {
-            if(s.get_instance_material(j)->transmittance == 0.0f)
+            bool pot_transparent = m[i].mat.potentially_transparent();
+            if((bool)rt == ray_traced && pot_transparent == transparent)
             {
-                pc.instance_id = j;
-                pc.disable_rt_reflection = s.is_instance_rt_reflection_disabled(j);
+                pc.instance_id = s.get_entity_instance_id(id, i);
+                pc.disable_rt_reflection = rt ? !rt->reflection : true;
                 gfx.push_constants(buf, &pc);
-                s.draw_instance(buf, j);
-            }
-            else
-            {
-                transparents.push_back(j);
+                m[i].mesh->draw(buf);
             }
         }
-    }
-
-    for(size_t j: transparents)
-    {
-        pc.instance_id = j;
-        pc.disable_rt_reflection = s.is_instance_rt_reflection_disabled(j);
-        gfx.push_constants(buf, &pc);
-        s.draw_instance(buf, j);
-    }
-
-    gfx.end_render_pass(buf);
+    });
 }
 
 }
@@ -146,7 +133,7 @@ forward_render_stage::forward_render_stage(
     const scene& s,
     entity cam_id,
     const options& opt
-):  render_stage(ctx), depth_pre_pass(ctx), background_gfx(ctx), foreground_gfx(ctx), opt(opt),
+):  render_stage(ctx), depth_pre_pass(ctx), gfx(ctx), rt_gfx(ctx), opt(opt),
     stage_timer(ctx, "forward_render_stage"),
     cam_id(cam_id),
     brdf_integration(ctx, get_readonly_path("data/brdf_integration.ktx")),
@@ -181,21 +168,21 @@ forward_render_stage::forward_render_stage(
         );
     }
 
-    init_shading_pipeline(false, background_gfx, ctx, color_target, depth_target, s, opt, true);
-    init_shading_pipeline(opt.ray_tracing, foreground_gfx, ctx, color_target, depth_target, s, opt, false);
+    init_shading_pipeline(false, gfx, ctx, color_target, depth_target, s, opt, true);
+    init_shading_pipeline(opt.ray_tracing, rt_gfx, ctx, color_target, depth_target, s, opt, false);
 
     for(uint32_t i = 0; i < ctx.get_image_count(); ++i)
     {
         // Assign descriptors
         s.set_descriptors(depth_pre_pass, i);
 
-        s.set_descriptors(background_gfx, i);
-        background_gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
-        background_gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+        s.set_descriptors(gfx, i);
+        gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
+        gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
 
-        s.set_descriptors(foreground_gfx, i);
-        foreground_gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
-        foreground_gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+        s.set_descriptors(rt_gfx, i);
+        rt_gfx.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
+        rt_gfx.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
 
         // Record command buffer
         VkCommandBuffer buf = graphics_commands();
@@ -205,26 +192,34 @@ forward_render_stage::forward_render_stage(
         depth_pre_pass.begin_render_pass(buf, i);
         depth_pre_pass.bind(buf, i);
 
-        push_constants pc = {0, 0, 0};
-        for(size_t j = 0; j < s.get_instance_count(); ++j)
-        {
-            if(s.is_instance_visible(j))
+        depth_push_constants pc = {0, 0};
+
+        s.get_ecs().foreach([&](entity id, model& m, visible&){
+            for(size_t i = 0; i < m.group_count(); ++i)
             {
-                if(s.get_instance_material(j)->transmittance == 0.0f)
+                if(m[i].mat.transmittance == 0.0f)
                 {
-                    pc.instance_id = j;
+                    pc.instance_id = s.get_entity_instance_id(id, i);
                     depth_pre_pass.push_constants(buf, &pc);
-                    s.draw_instance(buf, j);
+                    m[i].mesh->draw(buf);
                 }
             }
-        }
+        });
         depth_pre_pass.end_render_pass(buf);
 
-        // Background pass
-        do_shading_pass(i, buf, s, background_gfx, true);
+        // No-RT pass
+        gfx.bind(buf, i);
+        gfx.begin_render_pass(buf, i);
+        draw_entities(i, buf, s, gfx, false, false);
+        draw_entities(i, buf, s, gfx, false, true);
+        gfx.end_render_pass(buf);
 
-        // Foreground pass
-        do_shading_pass(i, buf, s, foreground_gfx, false);
+        // RT pass
+        rt_gfx.bind(buf, i);
+        rt_gfx.begin_render_pass(buf, i);
+        draw_entities(i, buf, s, rt_gfx, true, false);
+        draw_entities(i, buf, s, rt_gfx, true, true);
+        rt_gfx.end_render_pass(buf);
 
         stage_timer.stop(buf, i);
         use_graphics_commands(buf, i);

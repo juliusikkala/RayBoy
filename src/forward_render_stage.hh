@@ -9,10 +9,6 @@
 #include "texture.hh"
 #include "sampler.hh"
 
-
-// Tag component for objects that should render with ray tracing
-struct render_with_rt {};
-
 class render_target;
 class forward_render_stage: public render_stage
 {
@@ -41,8 +37,8 @@ protected:
 
 private:
     graphics_pipeline depth_pre_pass;
-    graphics_pipeline background_gfx;
-    graphics_pipeline foreground_gfx;
+    graphics_pipeline gfx;
+    graphics_pipeline rt_gfx;
     options opt;
     entity cam_id;
     texture brdf_integration;

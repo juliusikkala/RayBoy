@@ -3,6 +3,7 @@
 #include "helpers.hh"
 #include "error.hh"
 #include "stb_image.h"
+#include "scene.hh"
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
@@ -237,8 +238,7 @@ void load_gltf_node(
     int node_index,
     gltf_data& data,
     transformable* parent,
-    node_meta_info& meta,
-    bool mark_inner
+    node_meta_info& meta
 ){
     entity id = entities.add(transformable());
     tinygltf::Node& node = gltf_model.nodes[node_index];
@@ -274,6 +274,7 @@ void load_gltf_node(
             id,
             model(meta.models.at(gltf_model.meshes[node.mesh].name))
         );
+        entities.attach(id, visible{});
     }
 
     if(node.camera != -1)
@@ -325,17 +326,13 @@ void load_gltf_node(
         }
     }
 
-    if(mark_inner)
-    {
-        bool outer = node.extras.Has("outer_layer");
-        if(!outer) entities.attach(id, inner_node{});
-    }
+    bool outer = node.extras.Has("outer_layer");
+    if(outer) entities.attach(id, outer_layer{});
 
     // Load child nodes
     for(int child_index: node.children)
         load_gltf_node(
-            entities, gltf_model, scene, child_index, data, tnode, meta,
-            mark_inner
+            entities, gltf_model, scene, child_index, data, tnode, meta
         );
 }
 
@@ -344,8 +341,7 @@ void load_gltf_node(
 gltf_data load_gltf(
     context& ctx,
     const std::string& path,
-    ecs& entities,
-    bool mark_inner
+    ecs& entities
 ){
     gltf_data md;
 
@@ -616,8 +612,7 @@ gltf_data load_gltf(
     {
         for(int node_index: scene.nodes)
             load_gltf_node(
-                entities, gltf_model, scene, node_index, md, nullptr, meta,
-                mark_inner
+                entities, gltf_model, scene, node_index, md, nullptr, meta
             );
     }
 
