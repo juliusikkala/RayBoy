@@ -194,7 +194,8 @@ public:
     {
         LINEAR = 0,
         STEP,
-        CUBICSPLINE
+        CUBICSPLINE,
+        SMOOTHSTEP
     };
 
     animation();
@@ -212,6 +213,11 @@ public:
     void set_orientation(
         interpolation orientation_interpolation,
         std::vector<sample<quat>>&& orientation
+    );
+
+    void set_transform(
+        interpolation interpolation,
+        const std::vector<sample<mat4>>& transform
     );
 
     void apply(transformable& node, time_ticks time) const;

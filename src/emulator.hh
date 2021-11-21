@@ -49,6 +49,7 @@ public:
     void set_power(bool on);
 
     void set_button(GB_key_t button, bool pressed);
+    bool get_button(GB_key_t button);
     void print_info();
 
     static uvec2 get_screen_size();
@@ -84,6 +85,8 @@ private:
     std::vector<vec4> cur_faded_framebuffer;
     std::vector<vec4> prev_faded_framebuffer;
     std::vector<uint32_t> present_faded_framebuffer;
+
+    bool button_states[8];
 
     // Yeah, I'm lazy like that...
     std::recursive_mutex mutex;

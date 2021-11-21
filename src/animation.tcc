@@ -38,6 +38,8 @@ T animation::interpolate(
                 ratio
             );
         }
+    case SMOOTHSTEP:
+        return numeric_mixer<T>()(prev->data, it->data, smoothstep(0.0f, 1.0f, ratio));
     }
 }
 

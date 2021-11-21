@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "scene.hh"
 #define AUTOSAVE_INTERVAL (60*1000)
+#define BUTTON_ANIMATION_LENGTH_US (75000l)
 
 namespace
 {
@@ -125,6 +126,45 @@ void game::load_common_assets()
         console_data.entities["Screen"],
         ray_traced{true, false, false}
     );
+
+    // Setup default animations
+    mat4 a_initial_state = ecs_scene.get<transformable>(console_data.entities["A button"])->get_transform();
+    mat4 b_initial_state = ecs_scene.get<transformable>(console_data.entities["B button"])->get_transform();
+    mat4 start_initial_state = ecs_scene.get<transformable>(console_data.entities["Start"])->get_transform();
+    mat4 select_initial_state = ecs_scene.get<transformable>(console_data.entities["Select"])->get_transform();
+    button_animations.dpad_initial_state = ecs_scene.get<transformable>(console_data.entities["Dpad button"])->get_transform();
+
+    mat4 a_pressed = glm::translate(a_initial_state, vec3(0,-0.0007,0));
+    mat4 b_pressed = glm::translate(b_initial_state, vec3(0,-0.0007,0));
+    mat4 start_pressed = glm::translate(start_initial_state, vec3(0,-0.0005,0));
+    mat4 select_pressed = glm::translate(select_initial_state, vec3(0,-0.0005,0));
+
+    button_animations.a_button.set_transform(
+        animation::SMOOTHSTEP,
+        {{0, a_initial_state}, {BUTTON_ANIMATION_LENGTH_US, a_pressed}}
+    );
+
+    button_animations.b_button.set_transform(
+        animation::SMOOTHSTEP,
+        {{0, b_initial_state}, {BUTTON_ANIMATION_LENGTH_US, b_pressed}}
+    );
+
+    button_animations.select_button.set_transform(
+        animation::SMOOTHSTEP,
+        {{0, select_initial_state}, {BUTTON_ANIMATION_LENGTH_US, select_pressed}}
+    );
+
+    button_animations.start_button.set_transform(
+        animation::SMOOTHSTEP,
+        {{0, start_initial_state}, {BUTTON_ANIMATION_LENGTH_US, start_pressed}}
+    );
+
+    button_animations.a_time = 0;
+    button_animations.b_time = 0;
+    button_animations.select_time = 0;
+    button_animations.start_time = 0;
+    button_animations.dpad_time = 0;
+    button_animations.dpad_state = 0;
 }
 
 void game::load_scene(const std::string& name)
@@ -404,6 +444,7 @@ void game::update()
     viewer.direction.y = -1;
     gbc->set_position(distance * viewer.direction);
 
+    update_button_animations();
     updater.update(ecs_scene);
     audio_ctx->update();
 }
@@ -558,6 +599,90 @@ void game::update_gbc_material()
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
     }
+}
+
+void game::update_button_animations()
+{
+    time_ticks dt = delta_time*1000000l;
+
+    if(emu->get_button(GB_KEY_A)) button_animations.a_time += dt;
+    else button_animations.a_time -= dt;
+    button_animations.a_time = clamp(button_animations.a_time, 0l, BUTTON_ANIMATION_LENGTH_US);
+
+    if(emu->get_button(GB_KEY_B)) button_animations.b_time += dt;
+    else button_animations.b_time -= dt;
+    button_animations.b_time = clamp(button_animations.b_time, 0l, BUTTON_ANIMATION_LENGTH_US);
+
+    if(emu->get_button(GB_KEY_START)) button_animations.start_time += dt;
+    else button_animations.start_time -= dt;
+    button_animations.start_time = clamp(button_animations.start_time, 0l, BUTTON_ANIMATION_LENGTH_US);
+
+    if(emu->get_button(GB_KEY_SELECT)) button_animations.select_time += dt;
+    else button_animations.select_time -= dt;
+    button_animations.select_time = clamp(button_animations.select_time, 0l, BUTTON_ANIMATION_LENGTH_US);
+
+    int new_dpad_state = 0;
+    if(emu->get_button(GB_KEY_DOWN)) new_dpad_state |= 1;
+    if(emu->get_button(GB_KEY_UP)) new_dpad_state |= 2;
+    if(emu->get_button(GB_KEY_LEFT)) new_dpad_state |= 4;
+    if(emu->get_button(GB_KEY_RIGHT)) new_dpad_state |= 8;
+
+    if(new_dpad_state != button_animations.dpad_state)
+    {
+        button_animations.dpad_state = new_dpad_state;
+        button_animations.dpad_time = 0;
+        mat4 cur_dpad_state = ecs_scene.get<transformable>(console_data.entities["Dpad button"])->get_transform();
+        mat4 target_state = button_animations.dpad_initial_state;
+        // If opposite sides are pressed, just push the dpad down a bit.
+        if(
+            (emu->get_button(GB_KEY_DOWN) && emu->get_button(GB_KEY_UP)) ||
+            (emu->get_button(GB_KEY_LEFT) && emu->get_button(GB_KEY_RIGHT))
+        ){
+            target_state = glm::translate(target_state, vec3(0,-0.0005,0));
+        }
+        else if(new_dpad_state != 0)
+        {
+            vec2 axis = vec2(0);
+            if(emu->get_button(GB_KEY_DOWN)) axis.x = 1;
+            if(emu->get_button(GB_KEY_UP)) axis.x = -1;
+            if(emu->get_button(GB_KEY_LEFT)) axis.y = 1;
+            if(emu->get_button(GB_KEY_RIGHT)) axis.y = -1;
+            axis = normalize(axis);
+            target_state = glm::rotate(target_state, radians(3.5f), vec3(axis.x, 0, axis.y));
+            target_state = glm::translate(target_state, vec3(0,-0.0002,0));
+        }
+
+        button_animations.dpad_button.set_transform(
+            animation::SMOOTHSTEP,
+            {{0, cur_dpad_state}, {BUTTON_ANIMATION_LENGTH_US, target_state}}
+        );
+    }
+    button_animations.dpad_time += dt;
+
+    button_animations.a_button.apply(
+        *ecs_scene.get<transformable>(console_data.entities["A button"]),
+        button_animations.a_time
+    );
+
+    button_animations.b_button.apply(
+        *ecs_scene.get<transformable>(console_data.entities["B button"]),
+        button_animations.b_time
+    );
+
+    button_animations.start_button.apply(
+        *ecs_scene.get<transformable>(console_data.entities["Start"]),
+        button_animations.start_time
+    );
+
+    button_animations.select_button.apply(
+        *ecs_scene.get<transformable>(console_data.entities["Select"]),
+        button_animations.select_time
+    );
+
+    button_animations.dpad_button.apply(
+        *ecs_scene.get<transformable>(console_data.entities["Dpad button"]),
+        button_animations.dpad_time
+    );
 }
 
 uint32_t game::autosave(uint32_t interval, void* param)

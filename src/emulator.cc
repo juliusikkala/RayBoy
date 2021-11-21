@@ -99,6 +99,7 @@ emulator::emulator(audio& a)
     cur_faded_framebuffer.resize(160*144, vec4(1));
     prev_faded_framebuffer.resize(160*144, vec4(1));
     present_faded_framebuffer.resize(160*144, 0xFFFFFFFF);
+    for(bool& state: button_states) state = false;
 }
 
 emulator::~emulator()
@@ -185,7 +186,14 @@ void emulator::set_button(GB_key_t button, bool pressed)
 {
     std::unique_lock lock(mutex);
     if(powered) GB_set_key_state(&gb, button, pressed);
+    button_states[button-GB_KEY_RIGHT] = pressed;
 }
+
+bool emulator::get_button(GB_key_t button)
+{
+    return button_states[button-GB_KEY_RIGHT];
+}
+
 
 void emulator::print_info()
 {

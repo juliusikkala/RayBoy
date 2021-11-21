@@ -28,6 +28,7 @@ private:
     void create_pipeline();
     void refresh_pipeline_options();
     void update_gbc_material();
+    void update_button_animations();
     static uint32_t autosave(uint32_t interval, void* param);
 
     ecs ecs_scene;
@@ -57,6 +58,32 @@ private:
         float distance_steps = 0;
         vec3 direction = vec3(0);
     } viewer;
+
+    // The button animations are generated and updated programmatically, simply
+    // because that's easier than authoring 72 different animations for the
+    // dpad.
+    struct
+    {
+        // The dpad animation is the only one that actually changes. The others
+        // are predetermined and their timers just go back and forth based on
+        // button state.
+        mat4 dpad_initial_state;
+        animation dpad_button;
+        time_ticks dpad_time;
+        int dpad_state;
+
+        animation a_button;
+        time_ticks a_time;
+
+        animation b_button;
+        time_ticks b_time;
+
+        animation start_button;
+        time_ticks start_time;
+
+        animation select_button;
+        time_ticks select_time;
+    } button_animations;
     SDL_TimerID save_timer;
 };
 

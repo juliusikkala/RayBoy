@@ -33,6 +33,38 @@ void animation::set_orientation(
     determine_loop_time();
 }
 
+void animation::set_transform(
+    interpolation interp,
+    const std::vector<sample<mat4>>& transform
+){
+    this->position_interpolation = interp;
+    this->position.resize(transform.size());
+    this->scaling_interpolation = interp;
+    this->scaling.resize(transform.size());
+    this->orientation_interpolation = interp;
+    this->orientation.resize(transform.size());
+    for(size_t i = 0; i < transform.size(); ++i)
+    {
+        const sample<mat4>& t = transform[i];
+        position[i].timestamp = scaling[i].timestamp = orientation[i].timestamp = t.timestamp;
+        decompose_matrix(
+            t.data, position[i].data, scaling[i].data, orientation[i].data
+        );
+        if(interp == CUBICSPLINE)
+        {
+            decompose_matrix(
+                t.in_tangent, position[i].in_tangent,
+                scaling[i].in_tangent, orientation[i].in_tangent
+            );
+            decompose_matrix(
+                t.out_tangent, position[i].out_tangent,
+                scaling[i].out_tangent, orientation[i].out_tangent
+            );
+        }
+    }
+    determine_loop_time();
+}
+
 void animation::apply(transformable& node, time_ticks time) const
 {
     if(position.size())
