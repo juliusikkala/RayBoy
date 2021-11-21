@@ -33,7 +33,8 @@ float geometry_smith(float cos_l, float cos_v, float k)
 // Multiplied by pi so that it can be avoided later.
 float distribution_ggx(float cos_h, float a)
 {
-    float a2 = a * a;
+    // Avoid NaN values
+    float a2 = max(a * a, 1e-10);
     float denom = cos_h * cos_h * (a2 - 1.0f) + 1.0f;
     return a2 / (denom * denom);
 }
