@@ -27,8 +27,10 @@ struct instance
 struct camera
 {
     mat4 view_proj;
-    mat4 view_inv, proj_inv;
+    mat4 view;
     vec4 origin;
+    vec4 projection_info;
+    vec4 clip_info;
 };
 
 struct point_light
@@ -75,6 +77,15 @@ layout(binding = 3) buffer camera_buffer
 layout(binding = 4) uniform sampler2D textures[];
 
 layout(binding = 5) uniform samplerCube cube_textures[];
+
+vec3 unproject_depth(float depth, vec2 uv, in camera cam)
+{
+    return unproject_position(
+        linearize_depth(depth*2.0f-1.0f, cam.clip_info.xyz),
+        vec2(uv.x, 1-uv.y),
+        cam.projection_info.xy
+    );
+}
 
 material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 {

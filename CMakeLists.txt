@@ -37,6 +37,9 @@ set(shader_src
     src/emulator_transform.comp
     src/depth.vert
     src/depth.frag
+    src/gbuffer.vert
+    src/gbuffer.frag
+    src/rt.frag
     # Add more shader sources here
 )
 set(shader_binary
@@ -49,6 +52,9 @@ set(shader_binary
     emulator_transform.comp.h
     depth.vert.h
     depth.frag.h
+    gbuffer.vert.h
+    gbuffer.frag.h
+    rt.frag.h
     # Add more shader binaries here
 )
 
