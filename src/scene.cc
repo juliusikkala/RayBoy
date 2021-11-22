@@ -36,10 +36,8 @@ struct gpu_instance
 struct gpu_camera
 {
     mat4 view_proj;
-    mat4 view;
+    mat4 view_inv, proj_inv;
     vec4 origin;
-    vec4 projection_info;
-    vec4 clip_info;
 };
 
 struct gpu_point_light
@@ -206,10 +204,9 @@ bool scene::update(uint32_t image_index)
 
             data[i++] = {
                 proj * view,
-                view,
-                view_inv[3],
-                vec4(c.get_projection_info(), 0, 0),
-                vec4(c.get_clip_info(), 0)
+                view_inv,
+                proj_inv,
+                view_inv[3]
             };
         });
     });

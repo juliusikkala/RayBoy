@@ -1,6 +1,6 @@
 #ifndef MATERIAL_GLSL
 #define MATERIAL_GLSL
-#include "math.glsl"
+const float M_PI = 3.141592;
 
 struct material
 {

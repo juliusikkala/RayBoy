@@ -17,10 +17,7 @@ fancy_render_pipeline::fancy_render_pipeline(
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_STORAGE_BIT|
         VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        true
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     ),
     gb_pixel_sampler(ctx, VK_FILTER_LINEAR, VK_FILTER_LINEAR)
 {

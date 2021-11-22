@@ -21,12 +21,11 @@ texture::texture(
     VkImageUsageFlags usage,
     VkImageLayout layout,
     VkSampleCountFlagBits samples,
-    VkImageViewType type,
-    bool mipmapped
+    VkImageViewType type
 ):  ctx(&ctx), dim(size, 1), format(format), tiling(tiling),
     usage(usage), layout(layout), samples(samples), opaque(false)
 {
-    load_from_data(data_size, data, type, mipmapped);
+    load_from_data(data_size, data, type);
 }
 
 VkImageView texture::get_image_view(uint32_t image_index) const
@@ -220,12 +219,8 @@ void texture::load_from_stb(const std::string& path)
     views.emplace_back(create_image_view(*ctx, images[0], format, VK_IMAGE_ASPECT_COLOR_BIT));
 }
 
-void texture::load_from_data(
-    size_t data_size,
-    void* data,
-    VkImageViewType type,
-    bool mipmapped
-){
+void texture::load_from_data(size_t data_size, void* data, VkImageViewType type)
+{
     size_t count = 1;
     if((usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0)
     {
@@ -236,7 +231,7 @@ void texture::load_from_data(
     {
         images.emplace_back(create_gpu_image(
             *ctx, dim, format, layout, samples, tiling, usage, type, data_size, data,
-            mipmapped
+            (layout&VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         ));
         views.emplace_back(create_image_view(*ctx, images[i], format, deduce_image_aspect_flags(format), type));
     }

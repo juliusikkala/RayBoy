@@ -31,6 +31,7 @@ protected:
     context* ctx;
 
 private:
+    VkDescriptorSetLayoutBinding find_binding(size_t binding_index) const;
     void ensure_semaphores(size_t count);
 
     bool first_frame;

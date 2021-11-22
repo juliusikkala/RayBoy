@@ -21,8 +21,7 @@ public:
         VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
         VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL,
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
-        VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D,
-        bool mipmapped = false
+        VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D
     );
     texture(const context& other) = delete;
     texture(texture&& other) = default;
@@ -44,7 +43,7 @@ private:
     void load_from_file(const std::string& path);
     void load_from_ktx(const std::string& path);
     void load_from_stb(const std::string& path);
-    void load_from_data(size_t data_size, void* data, VkImageViewType type, bool mipmapped);
+    void load_from_data(size_t data_size, void* data, VkImageViewType type);
 
     context* ctx;
 
