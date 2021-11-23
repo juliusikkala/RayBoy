@@ -10,7 +10,8 @@ layout(push_constant) uniform push_constant_buffer
 {
     uint instance_id;
     uint camera_id;
-    uint disable_rt_reflection; // unused here
+    uint disable_rt_reflection;
+    float accumulation_ratio;
 } pc;
 
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
@@ -44,7 +45,8 @@ void main()
         mat.normal,
         view_dir,
         mat,
-        uv.zw
+        uv.zw,
+        cam.noise.xy
     ) + mat.emission;
 
     [[unroll]] for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
@@ -55,7 +57,7 @@ void main()
         get_point_light_info(pl, position, light_dir, color);
         // Hack to prevent normal map weirdness at grazing angles
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
-        vec3 shadow = point_light_shadow(position, pl);
+        vec3 shadow = point_light_shadow(position, pl, cam.noise.xy);
         lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
     }
 

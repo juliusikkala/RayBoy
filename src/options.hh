@@ -17,10 +17,12 @@ struct options
     bool ray_tracing = true;
     unsigned shadow_rays = 1;
     unsigned reflection_rays = 1;
+    unsigned refraction_rays = 1;
     int display_index = -1;
     std::string mode = "plain";
     std::string gb_color = "atomic-purple";
     std::string scene = "white_room";
+    unsigned accumulation = 3;
 
     json serialize() const;
     bool deserialize(const json& j);

@@ -153,35 +153,7 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit)
     return color;
 }
 
-mat3 create_tangent_space(vec3 normal)
-{
-    vec3 major;
-    if(abs(normal.x) < 0.57735026918962576451) major = vec3(1,0,0);
-    else if(abs(normal.y) < 0.57735026918962576451) major = vec3(0,1,0);
-    else major = vec3(0,0,1);
-
-    vec3 tangent = normalize(cross(normal, major));
-    vec3 bitangent = cross(normal, tangent);
-
-    return mat3(tangent, bitangent, normal);
-}
-
-//https://pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations
-vec2 concentric_mapping(vec2 u)
-{
-    vec2 uOffset = 2.0f * u - 1.0f;
-    vec2 abs_uOffset = abs(uOffset);
-
-    if(all(lessThan(abs_uOffset, vec2(1e-4))))
-        return vec2(0);
-
-    vec2 r_theta = abs_uOffset.x > abs_uOffset.y ?
-        vec2(uOffset.x, M_PI * 0.25 * uOffset.y / uOffset.x) :
-        vec2(uOffset.y, M_PI * 0.5 - M_PI * 0.25 * uOffset.x / uOffset.y);
-    return r_theta.x * vec2(cos(r_theta.y), sin(r_theta.y));
-}
-
-vec3 point_light_shadow(vec3 position, point_light pl)
+vec3 point_light_shadow(vec3 position, point_light pl, vec2 noise)
 {
     vec3 pos = pl.pos_falloff.xyz;
     float radius = pl.color_radius.w;
@@ -199,7 +171,7 @@ vec3 point_light_shadow(vec3 position, point_light pl)
         dir /= dist;
         mat3 tbn = create_tangent_space(dir);
         ivec2 noise_pos = ivec2(mod(gl_FragCoord.xy, vec2(textureSize(blue_noise, 0))));
-        vec2 ld_off = texelFetch(blue_noise, noise_pos, 0).xy;
+        vec2 ld_off = texelFetch(blue_noise, noise_pos, 0).xy + noise;
 
         [[unroll]] for(uint i = 0; i < SHADOW_RAY_COUNT; ++i)
         {
@@ -214,36 +186,24 @@ vec3 point_light_shadow(vec3 position, point_light pl)
     return shadow/SHADOW_RAY_COUNT;
 }
 
-vec3 get_indirect_light_rt(
+vec3 clamped_reflect(vec3 I, vec3 N)
+{
+    return 2.0f * max(dot(N, I), 0.0f) * N - I;
+}
+
+vec3 evaluate_reflection(
     vec3 pos,
+    vec3 fallback_value,
     ivec3 environment_indices,
-    vec3 normal,
     vec3 view,
     in material mat,
-    vec2 lightmap_uv
+    vec2 noise
 ){
-    vec3 diffuse_attenuation;
-    vec3 specular_attenuation;
-    brdf_indirect(
-        view, mat, diffuse_attenuation, specular_attenuation
-    );
-    vec3 indirect_diffuse = vec3(0);
-    vec3 indirect_specular = vec3(0);
-
-    // Instead of reflect(), we use a clamped version of the same calculation to
-    // reduce shimmering edge artefacts.
-    vec3 ref_dir = 2.0f * max(
-        dot(normal, view), 0.0f
-    ) * normal - view;
-
-    if(environment_indices.x != -1)
-    {
-        float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
-        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
-    }
+    vec3 indirect_specular = fallback_value;
 
     if(REFLECTION_RAY_COUNT == 1)
     {
+        vec3 ref_dir = clamped_reflect(view, mat.normal);
         if(pc.disable_rt_reflection != 1)
         {
             const float REFLECTION_RAY_LIMIT_ROUGHNESS = 0.3;
@@ -265,10 +225,10 @@ vec3 get_indirect_light_rt(
         if(pc.disable_rt_reflection != 1)
         {
             indirect_specular = vec3(0);
-            mat3 tbn = create_tangent_space(normal);
+            mat3 tbn = create_tangent_space(mat.normal);
             mat3 inv_tbn = transpose(tbn);
             ivec2 noise_pos = ivec2(mod(gl_FragCoord.xy, vec2(textureSize(blue_noise, 0))));
-            vec2 ld_off = texelFetch(blue_noise, noise_pos, 0).xy;
+            vec2 ld_off = texelFetch(blue_noise, noise_pos, 0).xy + noise;
             vec3 tan_view = inv_tbn * view;
             [[unroll]] for(uint i = 0; i < REFLECTION_RAY_COUNT; ++i)
             {
@@ -284,6 +244,38 @@ vec3 get_indirect_light_rt(
             indirect_specular /= REFLECTION_RAY_COUNT;
         }
     }
+
+    return indirect_specular;
+}
+
+vec3 get_indirect_light_rt(
+    vec3 pos,
+    ivec3 environment_indices,
+    vec3 normal,
+    vec3 view,
+    in material mat,
+    vec2 lightmap_uv,
+    vec2 noise
+){
+    vec3 diffuse_attenuation;
+    vec3 specular_attenuation;
+    brdf_indirect(
+        view, mat, diffuse_attenuation, specular_attenuation
+    );
+    vec3 indirect_diffuse = vec3(0);
+    vec3 indirect_specular = vec3(0);
+
+    vec3 ref_dir = clamped_reflect(view, mat.normal);
+
+    if(environment_indices.x != -1)
+    {
+        float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
+        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
+    }
+
+    indirect_specular = evaluate_reflection(
+        pos, indirect_specular, environment_indices, view, mat, noise
+    );
 
     if(environment_indices.y != -1)
     {

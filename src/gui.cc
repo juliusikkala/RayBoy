@@ -230,6 +230,58 @@ void gui::update()
                         }
                         ImGui::EndMenu();
                     }
+                    if(ImGui::BeginMenu("Refraction quality"))
+                    {
+                        static constexpr struct {
+                            const char* name;
+                            unsigned value;
+                        } refraction_options[] = {
+                            {"Off", 0},
+                            {"Lowest (1 ray)", 1},
+                            {"Low (2 rays)", 2},
+                            {"Medium (4 rays)", 4},
+                            {"High (8 rays)", 8},
+                            {"Highest (16 rays)", 16},
+                            {"Lagfest (32 rays)", 32},
+                            {"Bullshot mode (64 rays)", 64}
+                        };
+                        for(auto [name, value]: refraction_options)
+                        {
+                            if(ImGui::MenuItem(name, NULL, value == opts->refraction_rays))
+                            {
+                                opts->refraction_rays = value;
+                                SDL_Event e;
+                                e.type = SDL_USEREVENT;
+                                e.user.code = SET_RT_OPTION;
+                                SDL_PushEvent(&e);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                    if(ImGui::BeginMenu("Sample accumulation"))
+                    {
+                        static constexpr struct {
+                            const char* name;
+                            unsigned value;
+                        } accumulation_options[] = {
+                            {"Off (noisy)", 0},
+                            {"Fast (noisy but quick)", 1},
+                            {"Medium (middle road)", 2},
+                            {"Slow (noise-free but slow)", 3}
+                        };
+                        for(auto [name, value]: accumulation_options)
+                        {
+                            if(ImGui::MenuItem(name, NULL, value == opts->accumulation))
+                            {
+                                opts->accumulation = value;
+                                SDL_Event e;
+                                e.type = SDL_USEREVENT;
+                                e.user.code = SET_RT_OPTION;
+                                SDL_PushEvent(&e);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
                 }
 
                 if(ImGui::BeginMenu("Console color"))

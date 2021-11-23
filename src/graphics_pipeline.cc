@@ -34,7 +34,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         VK_FALSE,
         VK_FALSE,
         VK_POLYGON_MODE_FILL,
-        VK_CULL_MODE_NONE,
+        VK_CULL_MODE_BACK_BIT,
         VK_FRONT_FACE_COUNTER_CLOCKWISE,
         VK_FALSE, 0.0f, 0.0f, 0.0f,
         0.0f
@@ -109,7 +109,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         }
         else
         {
-            clear.color = {1.0f, 0.0f, 0.0f, 1.0f};
+            clear.color = {0.0f, 1.0f, 0.0f, 1.0f};
         }
         clear_values[i] = clear;
     }

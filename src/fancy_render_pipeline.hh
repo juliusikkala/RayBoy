@@ -20,6 +20,8 @@ public:
         bool ray_tracing = false;
         unsigned shadow_rays = 1;
         unsigned reflection_rays = 1;
+        unsigned refraction_rays = 1;
+        float accumulation_ratio = 0.1;
     };
 
     fancy_render_pipeline(

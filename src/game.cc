@@ -444,7 +444,7 @@ void game::update()
     viewer.direction.y = -1;
     gbc->set_position(distance * viewer.direction);
 
-    update_button_animations();
+    //update_button_animations();
     updater.update(ecs_scene);
     audio_ctx->update();
 }
@@ -495,7 +495,9 @@ void game::create_pipeline()
             (VkSampleCountFlagBits)opt.msaa_samples,
             gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
             opt.shadow_rays,
-            opt.reflection_rays
+            opt.reflection_rays,
+            opt.refraction_rays,
+            1.0f/(opt.accumulation*opt.accumulation+1)
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
         material* screen_mat = &(*screen_model)[3].mat;
@@ -522,7 +524,11 @@ void game::refresh_pipeline_options()
     {
         fancy_render_pipeline::options fancy_options = {
             opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples,
-            gfx_ctx->get_device().supports_ray_tracing
+            gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
+            opt.shadow_rays,
+            opt.reflection_rays,
+            opt.refraction_rays,
+            1.0f/(opt.accumulation*opt.accumulation+1)
         };
         ptr->set_options(fancy_options);
     }

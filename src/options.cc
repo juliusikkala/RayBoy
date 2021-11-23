@@ -16,10 +16,12 @@ json options::serialize() const
     j["ray_tracing"] = ray_tracing;
     j["shadow_rays"] = shadow_rays;
     j["reflection_rays"] = reflection_rays;
+    j["refraction_rays"] = refraction_rays;
     j["display_index"] = display_index;
     j["mode"] = mode;
     j["gb_color"] = gb_color;
     j["scene"] = scene;
+    j["accumulation"] = accumulation;
     return j;
 }
 
@@ -51,10 +53,12 @@ bool options::deserialize(const json& j)
         ray_tracing = j.value("ray_tracing", true);
         shadow_rays = j.value("shadow_rays", 1);
         reflection_rays = j.value("reflection_rays", 1);
+        refraction_rays = j.value("refraction_rays", 1);
         display_index = j.value("display_index", -1);
         mode = j.value("mode", "plain");
         gb_color = j.value("gb_color", "atomic-purple");
         scene = j.value("scene", "white_room");
+        accumulation = j.value("accumulation", 1);
     }
     catch(...)
     {

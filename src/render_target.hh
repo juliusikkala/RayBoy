@@ -15,6 +15,7 @@ public:
         VkImageLayout layout;
     };
 
+    render_target() = default;
     render_target(
         const std::vector<frame>& init_frames,
         uvec2 size,

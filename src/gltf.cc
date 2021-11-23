@@ -406,7 +406,10 @@ gltf_data load_gltf(
                 image.image.data(),
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_IMAGE_VIEW_TYPE_2D,
+                true
             ));
 
             if(check_opaque(image))
