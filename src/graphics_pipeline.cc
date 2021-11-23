@@ -109,7 +109,7 @@ graphics_pipeline::params::params(const std::vector<render_target*>& targets)
         }
         else
         {
-            clear.color = {0.0f, 1.0f, 0.0f, 1.0f};
+            clear.color = {1.0f, 0.0f, 0.0f, 1.0f};
         }
         clear_values[i] = clear;
     }

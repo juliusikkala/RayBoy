@@ -449,7 +449,7 @@ void game::update()
     viewer.direction.y = -1;
     gbc->set_position(distance * viewer.direction);
 
-    //update_button_animations();
+    update_button_animations();
     updater.update(ecs_scene);
     audio_ctx->update();
 }
