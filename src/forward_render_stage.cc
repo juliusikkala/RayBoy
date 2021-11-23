@@ -61,25 +61,32 @@ forward_render_stage::forward_render_stage(
         render_target transparent_normal = rt.transparent_normal->get_render_target();
         render_target transparent_accumulation = rt.transparent_accumulation->get_render_target();
 
-        init_depth_pre_pass(
-            rt.opaque_depth_pre_pass, s, &opaque_depth,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-        );
-        init_depth_pre_pass(
-            rt.transparent_depth_pre_pass, s, &transparent_depth,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
-            false
-        );
-        init_generate_pass(
-            rt.opaque_generate_pass, s,
-            &opaque_depth, &opaque_normal, &opaque_accumulation,
-            true
-        );
-        init_generate_pass(
-            rt.transparent_generate_pass, s,
-            &transparent_depth, &transparent_normal, &transparent_accumulation,
-            false
-        );
+        if(opt.reflection_rays > 1)
+        {
+            init_depth_pre_pass(
+                rt.opaque_depth_pre_pass, s, &opaque_depth,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+            );
+            init_depth_pre_pass(
+                rt.transparent_depth_pre_pass, s, &transparent_depth,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+                false
+            );
+            init_generate_pass(
+                rt.opaque_generate_pass, s,
+                &opaque_depth, &opaque_normal, &opaque_accumulation,
+                true
+            );
+            init_generate_pass(
+                rt.transparent_generate_pass, s,
+                &transparent_depth, &transparent_normal, &transparent_accumulation,
+                false
+            );
+        }
+        else
+        {
+            this->opt.accumulation_ratio = 1.0f;
+        }
         init_gather_pass(rt.opaque_gather_pass, s, color_target, depth_target, true);
         init_gather_pass(rt.transparent_gather_pass, s, color_target, depth_target, false);
     }
@@ -93,7 +100,7 @@ forward_render_stage::forward_render_stage(
         VkCommandBuffer buf = graphics_commands();
         stage_timer.start(buf, i);
 
-        if(opt.ray_tracing)
+        if(opt.ray_tracing && opt.reflection_rays > 1)
         {
             // Opaque depth pre-pass
             rt.opaque_depth_pre_pass.bind(buf, i);

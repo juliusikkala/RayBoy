@@ -68,13 +68,42 @@ vec3 gather_indirect_light_rt(
         indirect_diffuse = diffuse_attenuation * sample_cubemap(environment_indices.y, normal, 0);
     }
 
+    vec3 ref_dir = clamped_reflect(view, mat.normal);
+
+    if(environment_indices.x != -1)
+    {
+        float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
+        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
+    }
+
     /*
     vec3 correct_specular = evaluate_reflection(
         position, indirect_specular, environment_indices, view, mat, cam.noise.xy
     );
     */
-
-    if(MSAA_LOOKUP == 0)
+    if(REFLECTION_RAY_COUNT == 0)
+    {
+        // Do nothing, we have all we need already
+    }
+    else if(REFLECTION_RAY_COUNT == 1)
+    {
+        if(pc.disable_rt_reflection != 1)
+        {
+            const float REFLECTION_RAY_LIMIT_ROUGHNESS = 0.3;
+            float fade = clamp((mat.roughness-REFLECTION_RAY_LIMIT_ROUGHNESS)*(1.0/REFLECTION_RAY_LIMIT_ROUGHNESS), 0, 1);
+            if(fade < 0.99)
+            {
+                bool hit = false;
+                vec3 refl_color = reflection_ray(position, ref_dir, 0.1, hit);
+                if(hit)
+                {
+                    refl_color *= brdf_sharp_specular_attenuation(ref_dir, view, mat);
+                    indirect_specular = mix(refl_color, indirect_specular, fade);
+                }
+            }
+        }
+    }
+    else if(MSAA_LOOKUP == 0)
     {
         indirect_specular = mix(vec3(1), mat.color.rgb, mat.metallic) * texelFetch(rt_reflection, ivec2(gl_FragCoord.xy), 0).rgb;
     }
