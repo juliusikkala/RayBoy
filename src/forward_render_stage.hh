@@ -59,7 +59,8 @@ private:
         const scene& s,
         render_target* depth,
         render_target* normal,
-        render_target* accumulation
+        render_target* accumulation,
+        bool opaque
     );
 
     void init_gather_pass(

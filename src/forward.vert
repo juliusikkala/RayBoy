@@ -13,6 +13,7 @@ layout(location = 1) out vec3 world_normal;
 layout(location = 2) out vec4 world_uv;
 layout(location = 3) out vec3 world_tangent;
 layout(location = 4) out vec3 world_bitangent;
+layout(location = 5) out vec4 prev_proj_pos;
 
 layout(push_constant) uniform push_constant_buffer
 {
@@ -29,6 +30,9 @@ void main()
 
     world_position = vec3(i.model_to_world * vec4(model_pos, 1.0f));
     gl_Position = cam.view_proj * vec4(world_position, 1.0f);
+
+    prev_proj_pos = i.prev_mvp * vec4(model_pos, 1.0f);
+    prev_proj_pos.y = -prev_proj_pos.y;
 
     // These outputs have to be normalized because the matrix product causes
     // non-unit length, which in turn weights the interpolation between normals

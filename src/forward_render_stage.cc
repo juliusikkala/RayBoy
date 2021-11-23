@@ -70,8 +70,16 @@ forward_render_stage::forward_render_stage(
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
             false
         );
-        init_generate_pass(rt.opaque_generate_pass, s, &opaque_depth, &opaque_normal, &opaque_accumulation);
-        init_generate_pass(rt.transparent_generate_pass, s, &transparent_depth, &transparent_normal, &transparent_accumulation);
+        init_generate_pass(
+            rt.opaque_generate_pass, s,
+            &opaque_depth, &opaque_normal, &opaque_accumulation,
+            true
+        );
+        init_generate_pass(
+            rt.transparent_generate_pass, s,
+            &transparent_depth, &transparent_normal, &transparent_accumulation,
+            false
+        );
         init_gather_pass(rt.opaque_gather_pass, s, color_target, depth_target, true);
         init_gather_pass(rt.transparent_gather_pass, s, color_target, depth_target, false);
     }
@@ -361,7 +369,8 @@ void forward_render_stage::init_generate_pass(
     const scene& s,
     render_target* depth,
     render_target* normal,
-    render_target* accumulation
+    render_target* accumulation,
+    bool opaque
 ){
     shader_data sd;
 
@@ -389,7 +398,9 @@ void forward_render_stage::init_generate_pass(
     std::vector<VkDescriptorSetLayoutBinding> bindings = s.get_bindings();
     bindings.push_back({9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     bindings.push_back({10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
-    // TODO: Bindings for buffers from previous frame for accumulation
+    bindings.push_back({11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    bindings.push_back({12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    bindings.push_back({13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
     gfx_params.attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     gfx_params.attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -407,11 +418,24 @@ void forward_render_stage::init_generate_pass(
         sizeof(push_constants)
     );
 
-    for(uint32_t i = 0; i < ctx->get_image_count(); ++i)
+    uint32_t j = ctx->get_image_count()-1;
+    for(uint32_t i = 0; i < ctx->get_image_count(); ++i, j = (j+1)%ctx->get_image_count())
     {
         s.set_descriptors(gp, i);
         gp.set_descriptor(i, 9, {blue_noise.get_image_view(i)}, {brdf_integration_sampler.get()});
         gp.set_descriptor(i, 10, {brdf_integration.get_image_view(i)}, {brdf_integration_sampler.get()});
+        if(opaque)
+        {
+            gp.set_descriptor(i, 11, {rt.opaque_depth->get_image_view(j)}, {buffer_sampler.get()});
+            gp.set_descriptor(i, 12, {rt.opaque_normal->get_image_view(j)}, {buffer_sampler.get()});
+            gp.set_descriptor(i, 13, {rt.opaque_accumulation->get_image_view(j)}, {buffer_sampler.get()});
+        }
+        else
+        {
+            gp.set_descriptor(i, 11, {rt.transparent_depth->get_image_view(j)}, {buffer_sampler.get()});
+            gp.set_descriptor(i, 12, {rt.transparent_normal->get_image_view(j)}, {buffer_sampler.get()});
+            gp.set_descriptor(i, 13, {rt.transparent_accumulation->get_image_view(j)}, {buffer_sampler.get()});
+        }
     }
 }
 

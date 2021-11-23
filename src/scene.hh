@@ -85,6 +85,7 @@ private:
     std::unordered_map<material::sampler_tex, int32_t> st_pairs;
     std::unordered_map<const environment_map*, int32_t> envmap_indices;
     std::unordered_map<entity, std::vector<uint32_t>> entity_instances;
+    std::unordered_map<entity, mat4> old_mvps;
 
     struct descriptor_info
     {

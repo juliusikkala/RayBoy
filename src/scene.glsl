@@ -19,6 +19,7 @@ struct instance
 {
     mat4 model_to_world;
     mat4 normal_to_world;
+    mat4 prev_mvp;
     material_spec material;
     // x = radiance index, y = irradiance index, z = lightmap index, w = mesh_index
     ivec4 environment_mesh;

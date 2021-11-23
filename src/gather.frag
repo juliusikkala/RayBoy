@@ -29,6 +29,7 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec4 uv;
 layout(location = 3) in vec3 tangent;
 layout(location = 4) in vec3 bitangent;
+layout(location = 5) in vec4 prev_proj_pos;
 
 layout(location = 0) out vec4 color;
 
@@ -112,7 +113,7 @@ void main()
     vec3 lighting = gather_indirect_light_rt(
         mat3(cam.view)* (position - cam.origin.xyz),
         i.environment_mesh.xyz,
-        mat3(cam.view) * normalize(mat.normal),
+        mat3(cam.view) * normalize(normal),
         view_dir,
         mat,
         cam

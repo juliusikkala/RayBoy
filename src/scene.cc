@@ -28,6 +28,7 @@ struct gpu_instance
 {
     mat4 model_to_world;
     mat4 normal_to_world;
+    mat4 prev_mvp;
     gpu_material material;
     // x = radiance index, y = irradiance index, z = lightmap index, w = mesh index
     ivec4 environment_mesh;
@@ -113,6 +114,28 @@ bool scene::update(uint32_t image_index)
         "Too many entities in scene!"
     );
 
+    mat4 vp = mat4(1);
+    cameras.update<gpu_camera>(image_index, [&](gpu_camera* data) {
+        size_t i = 0;
+        e->foreach([&](entity id, transformable& t, camera& c) {
+            mat4 view_inv = t.get_global_transform();
+            mat4 view = inverse(view_inv);
+            mat4 proj = c.get_projection();
+            mat4 proj_inv = inverse(proj);
+
+            if(i == 0) vp = proj * view;
+
+            data[i++] = {
+                proj * view,
+                view,
+                vec4(c.get_projection_info(), 0, 0),
+                vec4(c.get_clip_info(), 0),
+                view_inv[3],
+                linearRand(vec4(0), vec4(1))
+            };
+        });
+    });
+
     instances.update<gpu_instance>(image_index, [&](gpu_instance* data) {
         size_t i = 0;
         e->foreach([&](entity id, transformable& t, model& m, visible&) {
@@ -120,6 +143,10 @@ bool scene::update(uint32_t image_index)
             mat4 inv = inverseTranspose(mat);
             std::vector<uint32_t>& instances = entity_instances[id];
             instances.clear();
+            mat4 prev_mvp = mat4(NAN);
+            if(old_mvps.count(id))
+                prev_mvp = old_mvps[id];
+            old_mvps[id] = vp * mat;
 
             for(const model::vertex_group& group: m)
             {
@@ -127,6 +154,7 @@ bool scene::update(uint32_t image_index)
                 gpu_instance& inst = data[i++];
                 inst.model_to_world = mat;
                 inst.normal_to_world = inv;
+                inst.prev_mvp = prev_mvp;
                 inst.material.color_factor = group.mat.color_factor;
                 inst.material.metallic_roughness_normal_ior_factors = vec4(
                     group.mat.metallic_factor,
@@ -193,25 +221,6 @@ bool scene::update(uint32_t image_index)
             data[i++] = {
                 vec4(l.get_color(), 1),
                 vec4(t.get_global_direction(), cos(radians(l.get_radius())))
-            };
-        });
-    });
-
-    cameras.update<gpu_camera>(image_index, [&](gpu_camera* data) {
-        size_t i = 0;
-        e->foreach([&](entity id, transformable& t, camera& c) {
-            mat4 view_inv = t.get_global_transform();
-            mat4 view = inverse(view_inv);
-            mat4 proj = c.get_projection();
-            mat4 proj_inv = inverse(proj);
-
-            data[i++] = {
-                proj * view,
-                view,
-                vec4(c.get_projection_info(), 0, 0),
-                vec4(c.get_clip_info(), 0),
-                view_inv[3],
-                linearRand(vec4(0), vec4(1))
             };
         });
     });

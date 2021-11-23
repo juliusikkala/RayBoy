@@ -17,6 +17,11 @@ float deadzone(float value, float dz)
     return sign(value)*magnitude;
 }
 
+float calc_accumulation_ratio(int accumulation)
+{
+    return 0.5f/(accumulation*accumulation+1);
+}
+
 void handle_emulator_input(emulator& emu, const SDL_Event& event)
 {
     std::unordered_map<SDL_Keycode, GB_key_t> kb_bindings = {
@@ -497,7 +502,7 @@ void game::create_pipeline()
             opt.shadow_rays,
             opt.reflection_rays,
             opt.refraction_rays,
-            1.0f/(opt.accumulation*opt.accumulation+1)
+            calc_accumulation_ratio(opt.accumulation)
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
         material* screen_mat = &(*screen_model)[3].mat;
@@ -528,7 +533,7 @@ void game::refresh_pipeline_options()
             opt.shadow_rays,
             opt.reflection_rays,
             opt.refraction_rays,
-            1.0f/(opt.accumulation*opt.accumulation+1)
+            calc_accumulation_ratio(opt.accumulation)
         };
         ptr->set_options(fancy_options);
     }
