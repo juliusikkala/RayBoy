@@ -120,6 +120,7 @@ void game::load_common_assets()
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
     update_gbc_material();
+
     for(const auto& [name, id]: console_data.entities)
     {
         ecs_scene.attach(id, console_entity{});
@@ -390,6 +391,7 @@ bool game::handle_input()
                 break;
             case gui::SET_RT_OPTION:
                 pipeline.reset();
+                update_gbc_material();
                 break;
             case gui::SET_SCENE:
                 load_scene(opt.scene);
@@ -542,6 +544,11 @@ void game::refresh_pipeline_options()
 
 void game::update_gbc_material()
 {
+    if(!gfx_ctx->get_device().supports_ray_tracing || !opt.ray_tracing)
+    {
+        opt.gb_color = "teal";
+    }
+
     model* battery_cover = ecs_scene.get<model>(console_data.entities["Battery cover"]);
     model* back_panel = ecs_scene.get<model>(console_data.entities["Back panel"]);
     model* front_panel = ecs_scene.get<model>(console_data.entities["Front panel"]);

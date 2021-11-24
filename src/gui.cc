@@ -230,8 +230,10 @@ void gui::update()
                         }
                         ImGui::EndMenu();
                     }
-                    if(ImGui::BeginMenu("Refraction quality"))
-                    {
+                    if(
+                        opts->gb_color == "atomic-purple" &&
+                        ImGui::BeginMenu("Refraction quality")
+                    ){
                         static constexpr struct {
                             const char* name;
                             unsigned value;
@@ -302,6 +304,9 @@ void gui::update()
                     };
                     for(auto [name, id]: color_options)
                     {
+                        if(!opts->ray_tracing && !strcmp(id, "atomic-purple"))
+                            continue;
+
                         if(ImGui::MenuItem(name, NULL, opts->gb_color == id))
                         {
                             opts->gb_color = id;

@@ -93,7 +93,7 @@ void main()
             accumulation_ratio = mix(1, accumulation_ratio, pow(angle, 2.0f/max(mat.roughness, 1e-2)));
 
             float old_depth = texelFetch(prev_depth, sample_pos, 0).r;
-            if(abs(old_depth/proj_pos.z-1.0f) > 1e-4)
+            if(abs(old_depth/proj_pos.z-1.0f) > 1e-3)
             {
                 accumulation_ratio = 1.0f;
             }
