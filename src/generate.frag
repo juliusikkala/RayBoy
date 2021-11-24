@@ -11,6 +11,7 @@ layout(push_constant) uniform push_constant_buffer
     uint instance_id;
     uint camera_id;
     uint disable_rt_reflection;
+    uint disable_rt_refraction;
     float accumulation_ratio;
 } pc;
 

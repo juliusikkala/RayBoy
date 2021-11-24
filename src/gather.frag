@@ -11,6 +11,7 @@ layout(push_constant) uniform push_constant_buffer
     uint instance_id;
     uint camera_id;
     uint disable_rt_reflection;
+    uint disable_rt_refraction;
     float accumulation_ratio;
 } pc;
 
@@ -172,7 +173,7 @@ void main()
 
     float alpha = 1.0f;
 
-    if(mat.transmittance.r > 0.0f)
+    if(mat.transmittance.r > 0.0f && pc.disable_rt_refraction != 0)
     {
         float cos_d = abs(dot(view_dir, normal));
         float fresnel = fresnel_schlick(cos_d, mat.f0);

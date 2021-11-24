@@ -119,12 +119,11 @@ void game::load_common_assets()
         ecs_scene
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
-    update_gbc_material();
 
     for(const auto& [name, id]: console_data.entities)
     {
         ecs_scene.attach(id, console_entity{});
-        ecs_scene.attach(id, ray_traced{});
+        ecs_scene.attach(id, ray_traced{true, true, false});
         if(!ecs_scene.has<outer_layer>(id))
             ecs_scene.remove<visible>(id);
     }
@@ -132,6 +131,8 @@ void game::load_common_assets()
         console_data.entities["Screen"],
         ray_traced{true, false, false}
     );
+
+    update_gbc_material();
 
     // Setup default animations
     mat4 a_initial_state = ecs_scene.get<transformable>(console_data.entities["A button"])->get_transform();
@@ -387,11 +388,9 @@ bool game::handle_input()
                 pipeline.reset();
                 break;
             case gui::SET_GB_COLOR:
-                update_gbc_material();
-                break;
             case gui::SET_RT_OPTION:
-                pipeline.reset();
                 update_gbc_material();
+                pipeline.reset();
                 break;
             case gui::SET_SCENE:
                 load_scene(opt.scene);
@@ -552,6 +551,11 @@ void game::update_gbc_material()
     model* battery_cover = ecs_scene.get<model>(console_data.entities["Battery cover"]);
     model* back_panel = ecs_scene.get<model>(console_data.entities["Back panel"]);
     model* front_panel = ecs_scene.get<model>(console_data.entities["Front panel"]);
+
+    ray_traced* battery_cover_rt = ecs_scene.get<ray_traced>(console_data.entities["Battery cover"]);
+    ray_traced* back_panel_rt = ecs_scene.get<ray_traced>(console_data.entities["Back panel"]);
+    ray_traced* front_panel_rt = ecs_scene.get<ray_traced>(console_data.entities["Front panel"]);
+
     model* led = ecs_scene.get<model>(console_data.entities["Red LED"]);
 
     vec3 color = vec3(0);
@@ -596,6 +600,10 @@ void game::update_gbc_material()
     {
         color = vec3(0.95);
     }
+
+    if(battery_cover_rt) battery_cover_rt->refraction = opt.gb_color == "atomic-purple";
+    if(back_panel_rt) back_panel_rt->refraction = opt.gb_color == "atomic-purple";
+    if(front_panel_rt) front_panel_rt->refraction = opt.gb_color == "atomic-purple";
 
     for(auto& vg: *battery_cover)
     {

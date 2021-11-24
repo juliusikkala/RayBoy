@@ -17,6 +17,7 @@ struct push_constants
     uint32_t instance_id;
     uint32_t camera_id;
     uint32_t disable_rt_reflection;
+    uint32_t disable_rt_refraction;
     float accumulation_ratio;
 };
 
@@ -544,17 +545,21 @@ void forward_render_stage::draw_entities(
     int ray_traced,
     int transparent
 ){
-    push_constants pc = {0, 0, 0, opt.accumulation_ratio};
+    push_constants pc = {0, 0, 0, 0, opt.accumulation_ratio};
     s.get_ecs().foreach([&](entity id, model& m, visible&, struct ray_traced* rt){
         for(size_t i = 0; i < m.group_count(); ++i)
         {
+            pc.instance_id = s.get_entity_instance_id(id, i);
+            pc.disable_rt_reflection = rt ? !rt->reflection : true;
+            pc.disable_rt_refraction = rt ? !rt->refraction : true;
             bool pot_transparent = m[i].mat.potentially_transparent();
+            if(!pc.disable_rt_refraction)
+                pot_transparent = false;
+
             if(
                 (ray_traced < 0 || (bool)rt == ray_traced) &&
                 (transparent < 0 || pot_transparent == transparent)
             ){
-                pc.instance_id = s.get_entity_instance_id(id, i);
-                pc.disable_rt_reflection = rt ? !rt->reflection : true;
                 gfx.push_constants(buf, &pc);
                 m[i].mesh->draw(buf);
             }
