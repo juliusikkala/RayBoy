@@ -62,7 +62,7 @@ forward_render_stage::forward_render_stage(
         render_target transparent_normal = rt.transparent_normal->get_render_target();
         render_target transparent_accumulation = rt.transparent_accumulation->get_render_target();
 
-        if(opt.reflection_rays > 1)
+        if(opt.reflection_rays >= 1 || opt.refraction_rays >= 1)
         {
             init_depth_pre_pass(
                 rt.opaque_depth_pre_pass, s, &opaque_depth,
@@ -84,10 +84,12 @@ forward_render_stage::forward_render_stage(
                 false
             );
         }
-        else
+        
+        if(opt.reflection_rays <= 1 && opt.refraction_rays <= 1)
         {
             this->opt.accumulation_ratio = 1.0f;
         }
+
         init_gather_pass(rt.opaque_gather_pass, s, color_target, depth_target, true);
         init_gather_pass(rt.transparent_gather_pass, s, color_target, depth_target, false);
     }
@@ -101,7 +103,7 @@ forward_render_stage::forward_render_stage(
         VkCommandBuffer buf = graphics_commands();
         stage_timer.start(buf, i);
 
-        if(opt.ray_tracing && opt.reflection_rays > 1)
+        if(opt.ray_tracing && (opt.reflection_rays >= 1 || opt.refraction_rays >= 1))
         {
             // Opaque depth pre-pass
             rt.opaque_depth_pre_pass.bind(buf, i);
@@ -391,8 +393,10 @@ void forward_render_stage::init_generate_pass(
     sd.fragment_data = generate_frag_shader_binary;
     spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
+    spec_entries.push_back({4, 4*sizeof(uint32_t), sizeof(uint32_t)});
     spec_data.push_back(opt.shadow_rays);
     spec_data.push_back(opt.reflection_rays);
+    spec_data.push_back(opt.refraction_rays);
 
     sd.fragment_specialization.mapEntryCount = spec_entries.size();
     sd.fragment_specialization.pMapEntries = spec_entries.data();
@@ -466,8 +470,10 @@ void forward_render_stage::init_gather_pass(
     spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({4, 4*sizeof(uint32_t), sizeof(uint32_t)});
+    spec_entries.push_back({5, 5*sizeof(uint32_t), sizeof(uint32_t)});
     spec_data.push_back(opt.shadow_rays);
     spec_data.push_back(opt.reflection_rays);
+    spec_data.push_back(opt.refraction_rays);
     spec_data.push_back(color_target->get_samples() != VK_SAMPLE_COUNT_1_BIT ? 1 : 0);
 
     sd.fragment_specialization.mapEntryCount = spec_entries.size();

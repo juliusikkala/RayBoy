@@ -237,7 +237,9 @@ bool scene::update(uint32_t image_index)
                     if(rt)
                     {
                         data[rt_instance_count] = {
-                            {}, (uint32_t)i, group.mat.potentially_transparent() ? 2u : 1u, 0,
+                            {}, (uint32_t)i,
+                            group.mat.potentially_transparent() && !rt->refraction ? 2u : 1u,
+                            0,
                             VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
                             group.mesh->get_blas_address()
                         };
@@ -558,7 +560,8 @@ void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refre
         nullptr,
         VK_GEOMETRY_TYPE_INSTANCES_KHR,
         {},
-        VK_GEOMETRY_OPAQUE_BIT_KHR
+        VK_GEOMETRY_OPAQUE_BIT_KHR|
+        VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR
     };
     as_geom.geometry.instances = {
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,

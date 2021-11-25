@@ -107,8 +107,8 @@ material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 no
     mat.roughness = mr.y;
     mat.roughness2 = mat.roughness * mat.roughness;
 
-    mat.ior_after = spec.metallic_roughness_normal_ior_factors.w;
-    mat.ior_before = 1.0f;
+    mat.ior_after = front_facing ? spec.metallic_roughness_normal_ior_factors.w : 1.0;
+    mat.ior_before = front_facing ? 1.0 : spec.metallic_roughness_normal_ior_factors.w;
     mat.f0 = (mat.ior_after - mat.ior_before)/(mat.ior_after + mat.ior_before);
     mat.f0 *= mat.f0;
 

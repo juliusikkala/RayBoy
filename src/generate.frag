@@ -17,6 +17,7 @@ layout(push_constant) uniform push_constant_buffer
 
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
 layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
+layout(constant_id = 4) const int REFRACTION_RAY_COUNT = 0;
 
 #include "rt.glsl"
 
@@ -47,24 +48,37 @@ void main()
 
     // Don't apply color here yet (mostly matters for metals). This lets us
     // preserve more detail later on, as this pass's results may be denoised.
-    mat.color.rgb = vec3(1);
+    mat.color.rgb = mix(mat.color.rgb, vec3(1), mat.metallic);
 
     vec3 diffuse_attenuation;
     vec3 specular_attenuation;
     brdf_indirect(view_dir, mat, diffuse_attenuation, specular_attenuation);
-    vec3 indirect_specular = vec3(0);
+    vec3 passed_light = vec3(0);
 
     vec3 ref_dir = clamped_reflect(view_dir, mat.normal);
 
+    vec3 fallback_reflection = vec3(0);
+    vec3 fallback_refraction = vec3(0);
     if(environment_indices.x != -1)
     {
         float lod = mat.roughness * float(textureQueryLevels(cube_textures[nonuniformEXT(environment_indices.x)])-1);
-        indirect_specular = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
+        fallback_reflection = specular_attenuation * sample_cubemap(environment_indices.x, ref_dir, lod);
+        if(pc.disable_rt_refraction == 0)
+        {
+            fallback_refraction =
+                pow(mat.color.rgb, vec3(4)) * mat.transmittance * (1-specular_attenuation) *
+                sample_cubemap(environment_indices.x, -view_dir, 0);
+        }
     }
 
-    indirect_specular = evaluate_reflection(
-        position, indirect_specular, environment_indices, view_dir, mat,
+    passed_light += evaluate_reflection(
+        position, fallback_reflection, environment_indices, view_dir, mat,
         cam.noise.xy
+    );
+
+    passed_light += evaluate_refraction(
+        position, fallback_refraction, environment_indices, view_dir, normal,
+        mat, cam.noise.xy
     );
 
     float accumulation_ratio = pc.accumulation_ratio;
@@ -83,7 +97,7 @@ void main()
         // Don't propagate NaN or inf
         if(any(isnan(old_reflection))||any(isinf(old_reflection)))
         {
-            out_reflection = vec4(indirect_specular, 1.0f);
+            out_reflection = vec4(passed_light, 1.0f);
         }
         else
         {
@@ -98,12 +112,12 @@ void main()
             {
                 accumulation_ratio = 1.0f;
             }
-            out_reflection = vec4(mix(old_reflection, indirect_specular, accumulation_ratio), 1);
+            out_reflection = vec4(mix(old_reflection, passed_light, accumulation_ratio), 1);
         }
     }
     else
     {
-        out_reflection = vec4(indirect_specular, 1.0f);
+        out_reflection = vec4(passed_light, 1.0f);
     }
 
     out_normal = project_lambert_azimuthal_equal_area(new_view_normal);

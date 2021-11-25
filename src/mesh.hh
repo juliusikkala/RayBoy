@@ -22,7 +22,7 @@ public:
         context& ctx,
         std::vector<vertex>&& vertices,
         std::vector<uint32_t>&& indices,
-        bool opaque = false
+        bool opaque = true
     );
     mesh(mesh&& other) = default;
 
@@ -48,6 +48,8 @@ public:
     };
 
 private:
+    void rebuild_acceleration_structure();
+
     context* ctx;
     bool opaque;
     std::vector<vertex> vertices;

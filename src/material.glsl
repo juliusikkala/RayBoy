@@ -21,6 +21,19 @@ float fresnel_schlick(float cos_d, float f0)
     return f0 + (1.0f - f0) * pow(1.0f - cos_d, 5.0f);
 }
 
+float ggx_fresnel(float cos_d, material mat)
+{
+    if(mat.ior_before > mat.ior_after)
+    {
+        float inv_eta = mat.ior_before / mat.ior_after;
+        float sin_theta2 = inv_eta * inv_eta * (1.0f - cos_d * cos_d);
+        if(sin_theta2 >= 1.0f)
+            return 1.0f;
+        cos_d = sqrt(1.0f - sin_theta2);
+    }
+    return fresnel_schlick(cos_d, mat.f0);
+}
+
 // This is pre-divided by 4.0f*cos_l*cos_v (normally, that would be in the
 // nominator, but it would be divided out later anyway.)
 // Uses Schlick-GGX approximation for the geometry shadowing equation.
@@ -55,7 +68,7 @@ vec3 brdf(
     float k = mat.roughness2 + 1.0f;
     k = k * k * 0.125f;
 
-    vec3 fresnel = mix(vec3(fresnel_schlick(cos_d, mat.f0)), mat.color.rgb, mat.metallic);
+    vec3 fresnel = mix(vec3(ggx_fresnel(cos_d, mat)), mat.color.rgb, mat.metallic);
     float geometry = geometry_smith(cos_l, cos_v, k);
     float distribution = distribution_ggx(cos_h, mat.roughness2);
 
@@ -100,8 +113,7 @@ vec3 sample_ggx_vndf_tangent(vec3 view, float roughness, vec2 u)
     float p2 = r * sin(phi) * (u.y < a ? 1.0 : v.z);
 
     vec3 n = p1 * t1 + p2 * t2 + sqrt(max(0.0, 1.0 - p1*p1 - p2*p2)) * v;
-    n = normalize(vec3(roughness * n.x, roughness * n.y, max(0.0, n.z)));
-    return reflect(-view, n);
+    return normalize(vec3(roughness * n.x, roughness * n.y, max(0.0, n.z)));
 }
 
 vec3 ggx_vndf_attenuation(
@@ -112,7 +124,7 @@ vec3 ggx_vndf_attenuation(
     vec3 h = normalize(view_dir + light_dir);
     float cos_l = max(dot(mat.normal, light_dir), 0.0f);
     float cos_d = clamp(dot(view_dir, h), 0.0f, 1.0f);
-    vec3 fresnel = mix(vec3(fresnel_schlick(cos_d, mat.f0)), mat.color.rgb, mat.metallic);
+    vec3 fresnel = mix(vec3(ggx_fresnel(cos_d, mat)), mat.color.rgb, mat.metallic);
     float a2 = mat.roughness2 * mat.roughness2;
     float G2pG1 = 2.0f / (1.0f + sqrt(1.0f + a2 / (cos_l * cos_l) - a2));
     return fresnel * G2pG1;

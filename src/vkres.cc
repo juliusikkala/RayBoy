@@ -151,6 +151,7 @@ vkres<VkBuffer>::vkres(context& ctx, VkBuffer buf, VmaAllocation alloc)
 }
 
 vkres<VkBuffer>::vkres(vkres<VkBuffer>&& other)
+: ctx(VK_NULL_HANDLE)
 {
     operator=(std::move(other));
 }
@@ -182,6 +183,7 @@ void vkres<VkBuffer>::reset(VkBuffer buf, VmaAllocation alloc)
 
 void vkres<VkBuffer>::operator=(vkres<VkBuffer>&& other)
 {
+    reset();
     this->buffer = other.buffer;
     this->allocation = other.allocation;
     this->ctx = other.ctx;
@@ -221,6 +223,7 @@ vkres<VkImage>::vkres(context& ctx, VkImage img, VkDeviceMemory memory)
 }
 
 vkres<VkImage>::vkres(vkres<VkImage>&& other)
+: ctx(VK_NULL_HANDLE)
 {
     operator=(std::move(other));
 }
@@ -255,6 +258,7 @@ void vkres<VkImage>::reset(VkImage img, VmaAllocation alloc)
 
 void vkres<VkImage>::operator=(vkres<VkImage>&& other)
 {
+    reset();
     this->image = other.image;
     this->allocation = other.allocation;
     this->memory = other.memory;

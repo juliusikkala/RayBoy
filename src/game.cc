@@ -124,8 +124,6 @@ void game::load_common_assets()
     {
         ecs_scene.attach(id, console_entity{});
         ecs_scene.attach(id, ray_traced{true, true, false});
-        if(!ecs_scene.has<outer_layer>(id))
-            ecs_scene.remove<visible>(id);
     }
     ecs_scene.attach(
         console_data.entities["Screen"],
@@ -502,7 +500,7 @@ void game::create_pipeline()
             gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
             opt.shadow_rays,
             opt.reflection_rays,
-            opt.refraction_rays,
+            opt.gb_color == "atomic-purple" ? opt.refraction_rays : 0,
             calc_accumulation_ratio(opt.accumulation)
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
@@ -533,7 +531,7 @@ void game::refresh_pipeline_options()
             gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
             opt.shadow_rays,
             opt.reflection_rays,
-            opt.refraction_rays,
+            opt.gb_color == "atomic-purple" ? opt.refraction_rays : 0,
             calc_accumulation_ratio(opt.accumulation)
         };
         ptr->set_options(fancy_options);
@@ -543,11 +541,6 @@ void game::refresh_pipeline_options()
 
 void game::update_gbc_material()
 {
-    if(!gfx_ctx->get_device().supports_ray_tracing || !opt.ray_tracing)
-    {
-        opt.gb_color = "teal";
-    }
-
     model* battery_cover = ecs_scene.get<model>(console_data.entities["Battery cover"]);
     model* back_panel = ecs_scene.get<model>(console_data.entities["Back panel"]);
     model* front_panel = ecs_scene.get<model>(console_data.entities["Front panel"]);
@@ -601,15 +594,24 @@ void game::update_gbc_material()
         color = vec3(0.95);
     }
 
-    if(battery_cover_rt) battery_cover_rt->refraction = opt.gb_color == "atomic-purple";
-    if(back_panel_rt) back_panel_rt->refraction = opt.gb_color == "atomic-purple";
-    if(front_panel_rt) front_panel_rt->refraction = opt.gb_color == "atomic-purple";
+    bool opaque = transmittance == 0.0f;
+    if(!opaque && (!gfx_ctx->get_device().supports_ray_tracing || !opt.ray_tracing))
+    {
+        opt.gb_color = "teal";
+        return update_gbc_material();
+    }
+
+    if(battery_cover_rt) battery_cover_rt->refraction = !opaque;
+    if(back_panel_rt) back_panel_rt->refraction = !opaque;
+    if(front_panel_rt) front_panel_rt->refraction = !opaque;
 
     for(auto& vg: *battery_cover)
     {
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        // I'm so sorry...
+        const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
     }
 
     for(auto& vg: *back_panel)
@@ -617,6 +619,8 @@ void game::update_gbc_material()
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        // I'm so sorry...
+        const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
     }
 
     for(auto& vg: *front_panel)
@@ -624,6 +628,17 @@ void game::update_gbc_material()
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        // I'm so sorry...
+        const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
+    }
+
+    for(const auto& [name, id]: console_data.entities)
+    {
+        if(!ecs_scene.has<outer_layer>(id))
+        {
+            if(opaque) ecs_scene.remove<visible>(id);
+            else ecs_scene.attach(id, visible{});
+        }
     }
 }
 

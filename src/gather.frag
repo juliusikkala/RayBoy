@@ -17,7 +17,8 @@ layout(push_constant) uniform push_constant_buffer
 
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
 layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
-layout(constant_id = 4) const int MSAA_LOOKUP = 0;
+layout(constant_id = 4) const int REFRACTION_RAY_COUNT = 0;
+layout(constant_id = 5) const int MSAA_LOOKUP = 0;
 
 #include "rt.glsl"
 
@@ -82,34 +83,18 @@ vec3 gather_indirect_light_rt(
         position, indirect_specular, environment_indices, view, mat, cam.noise.xy
     );
     */
-    if(REFLECTION_RAY_COUNT == 0)
-    {
+    if(
+        (REFLECTION_RAY_COUNT == 0 || pc.disable_rt_reflection != 0) &&
+        (REFRACTION_RAY_COUNT == 0 || pc.disable_rt_refraction != 0)
+    ){
         // Do nothing, we have all we need already
     }
-    else if(REFLECTION_RAY_COUNT == 1)
-    {
-        if(pc.disable_rt_reflection != 1)
-        {
-            const float REFLECTION_RAY_LIMIT_ROUGHNESS = 0.3;
-            float fade = clamp((mat.roughness-REFLECTION_RAY_LIMIT_ROUGHNESS)*(1.0/REFLECTION_RAY_LIMIT_ROUGHNESS), 0, 1);
-            if(fade < 0.99)
-            {
-                bool hit = false;
-                vec3 refl_color = reflection_ray(position, ref_dir, 0.1, hit);
-                if(hit)
-                {
-                    refl_color *= brdf_sharp_specular_attenuation(ref_dir, view, mat);
-                    indirect_specular = mix(refl_color, indirect_specular, fade);
-                }
-            }
-        }
-    }
     else if(MSAA_LOOKUP == 0)
-    {
+    { // No MSAA, so just simple lookup
         indirect_specular = mix(vec3(1), mat.color.rgb, mat.metallic) * texelFetch(rt_reflection, ivec2(gl_FragCoord.xy), 0).rgb;
     }
     else
-    {
+    { // Complicated lookup for MSAA, so just simple lookup
         ivec2 best_off = ivec2(0);
         float best_weight = sample_weight(ivec2(0), view_pos, view_normal, cam);
 
@@ -123,6 +108,37 @@ vec3 gather_indirect_light_rt(
 
         indirect_specular = mix(vec3(1), mat.color.rgb, mat.metallic) * texelFetch(rt_reflection, ivec2(gl_FragCoord.xy)+best_off, 0).rgb;
     }
+
+    /*
+    if(REFRACTION_RAY_COUNT > 0 && pc.disable_rt_refraction == 0)
+    {
+        indirect_diffuse *= 1.0 - mat.transmittance;
+        if(mat.transmittance.r != 0.0f)
+        {
+            bool hit = false;
+            indirect_diffuse = refraction_ray(
+                position,
+                refract(
+                    refract(-view, mat.normal, mat.ior_before/mat.ior_after),
+                    normal,
+                    mat.ior_after/mat.ior_before
+                ),
+                mat.color.rgb,
+                0.2,
+                hit
+            );
+            if(!hit)
+            {
+                indirect_diffuse *= sample_cubemap(environment_indices.x, -view, 0);
+            }
+            else
+            {
+                // FUDGE
+                indirect_diffuse *= pow(mat.color.rgb, vec3(2));
+            }
+        }
+    }
+    */
 
     //return indirect_diffuse + correct_specular;
     return indirect_diffuse + indirect_specular;

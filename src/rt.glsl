@@ -120,7 +120,7 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit)
         rq,
         tlas,
         gl_RayFlagsOpaqueEXT,
-        1,
+        5,
         start,
         1e-4,
         dir,
@@ -148,6 +148,214 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit)
             vd.bitangent
         );
         color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+    }
+
+    return color;
+}
+
+vec3 xray(
+    vec3 start,
+    vec3 dir,
+    vec3 volume_color,
+    float max_dist,
+    out bool hit
+) {
+    vec3 color = vec3(1);
+    float dist = max_dist;
+    // First, we determine the distance to the next opaque surface and calculate
+    // shading for it while we're at it.
+    {
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsOpaqueEXT|gl_RayFlagsCullNoOpaqueEXT, 1, start, 1e-5, dir, max_dist
+        );
+
+        rayQueryProceedEXT(rq);
+
+        hit = rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+        if(hit)
+        {
+            dist = rayQueryGetIntersectionTEXT(rq, true);
+            uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+            uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
+            vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+            instance i = instances.array[nonuniformEXT(instance_id)];
+            vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+            material mat = sample_material(
+                i.material,
+                true,
+                vd.uv.xy,
+                vd.normal,
+                vd.tangent,
+                vd.bitangent
+            );
+            color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+        }
+    }
+
+    // Then, we abuse the any-hit mechanic to calculate the distance we travel
+    // inside the object.
+    float transmit_dist = 0;
+    {
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsCullOpaqueEXT, 1, start, 1e-5, dir, dist*1.01
+        );
+
+        while(rayQueryProceedEXT(rq))
+        {
+            uint type = rayQueryGetIntersectionTypeEXT(rq, false);
+            bool front = rayQueryGetIntersectionFrontFaceEXT(rq, false);
+            if(type == gl_RayQueryCandidateIntersectionTriangleEXT)
+            {
+                float t = rayQueryGetIntersectionTEXT(rq, false);
+                transmit_dist += front ? -t : t;
+            }
+        }
+        if(transmit_dist < 0) transmit_dist += dist;
+        color *= pow(volume_color, vec3(transmit_dist*1e3));
+    }
+
+    return color;
+}
+
+vec3 direct_refraction_ray(
+    vec3 start,
+    vec3 dir,
+    vec3 volume_color,
+    float max_dist,
+    out bool hit
+) {
+    vec3 color = vec3(1);
+    float dist = max_dist;
+    // First, we determine the distance to the next opaque surface and calculate
+    // shading for it while we're at it.
+    {
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsOpaqueEXT|gl_RayFlagsCullNoOpaqueEXT, 1, start, 1e-5, dir, max_dist
+        );
+
+        rayQueryProceedEXT(rq);
+
+        hit = rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+        if(hit)
+        {
+            dist = rayQueryGetIntersectionTEXT(rq, true);
+            uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+            uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
+            vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+            instance i = instances.array[nonuniformEXT(instance_id)];
+            vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+            material mat = sample_material(
+                i.material,
+                true,
+                vd.uv.xy,
+                vd.normal,
+                vd.tangent,
+                vd.bitangent
+            );
+            color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+        }
+    }
+
+    {
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsCullOpaqueEXT, 1, start, 1e-5, dir, dist*1.01
+        );
+
+        while(rayQueryProceedEXT(rq))
+        {
+            uint type = rayQueryGetIntersectionTypeEXT(rq, false);
+            bool front = rayQueryGetIntersectionFrontFaceEXT(rq, false);
+            if(type == gl_RayQueryCandidateIntersectionTriangleEXT)
+            {
+                float t = rayQueryGetIntersectionTEXT(rq, false);
+
+                uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, false);
+                uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, false);
+                vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, false);
+                instance i = instances.array[nonuniformEXT(instance_id)];
+                vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+                material mat = sample_material(
+                    i.material,
+                    front,
+                    vd.uv.xy,
+                    vd.normal,
+                    vd.tangent,
+                    vd.bitangent
+                );
+
+                float cos_d = clamp(dot(-dir, mat.normal), 0.0f, 1.0f);
+                color *= (1.0f - ggx_fresnel(cos_d, mat))*volume_color;
+            }
+        }
+    }
+
+    return color;
+}
+
+vec3 refraction_path(
+    vec3 start,
+    vec3 h,
+    vec3 dir,
+    material mat,
+    ivec3 environment_indices,
+    float max_dist
+) {
+    vec3 color = vec3(0);
+    vec3 tint = (1.0f - ggx_fresnel(clamp(dot(-dir, h), 0.0f, 1.0f), mat)) * mat.color.rgb;
+    vec3 light_tint = pow(mat.color.rgb, vec3(2));
+    float dist = max_dist;
+
+    // Refractions SUCK to calculate...
+    [[unroll]] for(int i = 0; i < 4; ++i)
+    {
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsOpaqueEXT, 5, start, 1e-5, dir, max_dist
+        );
+
+        rayQueryProceedEXT(rq);
+
+        bool hit = rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+        if(hit)
+        {
+            uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+            uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
+            vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+            bool front = rayQueryGetIntersectionFrontFaceEXT(rq, true);
+            instance i = instances.array[nonuniformEXT(instance_id)];
+            vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+            mat = sample_material(
+                i.material,
+                front,
+                vd.uv.xy,
+                vd.normal,
+                vd.tangent,
+                vd.bitangent
+            );
+
+            color += light_tint * tint * shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+            if(mat.transmittance.r == 0.0f)
+            {
+                break;
+            }
+            else
+            {
+                tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb;
+            }
+
+            start = vd.pos;
+            float ior_ratio = mat.ior_before/mat.ior_after;
+            dir = refract(dir, mat.normal, ior_ratio);
+        }
+        else
+        {
+            color += tint * sample_cubemap(environment_indices.x, dir, 0);
+            break;
+        }
     }
 
     return color;
@@ -233,7 +441,7 @@ vec3 evaluate_reflection(
             [[unroll]] for(uint i = 0; i < REFLECTION_RAY_COUNT; ++i)
             {
                 vec2 u = fract(ld_samples[i] + ld_off);
-                vec3 dir = tbn * sample_ggx_vndf_tangent(tan_view, mat.roughness2, u);
+                vec3 dir = tbn * reflect(-tan_view, sample_ggx_vndf_tangent(tan_view, mat.roughness2, u));
                 bool hit = false;
                 vec3 refl_color = reflection_ray(pos, dir, 0.1, hit);
                 if(!hit)
@@ -246,6 +454,63 @@ vec3 evaluate_reflection(
     }
 
     return indirect_specular;
+}
+
+vec3 evaluate_refraction(
+    vec3 pos,
+    vec3 fallback_value,
+    ivec3 environment_indices,
+    vec3 view,
+    vec3 normal,
+    in material mat,
+    vec2 noise
+){
+    vec3 light = fallback_value;
+
+    if(REFRACTION_RAY_COUNT == 1)
+    {
+        if(pc.disable_rt_refraction != 1)
+        {
+            bool hit = false;
+            vec3 rdir = refract(-view, mat.normal, mat.ior_before/mat.ior_after);
+            light = direct_refraction_ray(pos, rdir, mat.color.rgb, 0.2, hit);
+            light *= (1.0f-ggx_fresnel(dot(view, mat.normal), mat));
+            if(!hit)
+            {
+                light *= sample_cubemap(environment_indices.x, rdir, 0);
+            }
+            else
+            {
+                // FUDGE
+                light *= pow(mat.color.rgb, vec3(2));
+            }
+        }
+    }
+    else if(REFLECTION_RAY_COUNT >= 2)
+    {
+        if(pc.disable_rt_refraction != 1)
+        {
+            light = vec3(0);
+            mat3 tbn = create_tangent_space(mat.normal);
+            mat3 inv_tbn = transpose(tbn);
+            ivec2 noise_pos = ivec2(mod(gl_FragCoord.xy, vec2(textureSize(blue_noise, 0))));
+            vec2 ld_off = texelFetch(blue_noise, noise_pos, 0).xy + noise;
+            vec3 tan_view = inv_tbn * view;
+            float ior_ratio = mat.ior_before/mat.ior_after;
+            [[unroll]] for(uint i = 0; i < REFRACTION_RAY_COUNT; ++i)
+            {
+                vec2 u = fract(ld_samples[i] + ld_off);
+                vec3 h = tbn * sample_ggx_vndf_tangent(tan_view, mat.roughness2, u);
+                vec3 dir = refract(-view, h, ior_ratio);
+                vec3 refr_color = refraction_path(pos, h, dir, mat, environment_indices, 0.05);
+                // Yeah, the clamping is arbitrary. It removes some fireflies.
+                light += clamp(refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat)), vec3(0), vec3(5));
+            }
+            light /= REFRACTION_RAY_COUNT;
+        }
+    }
+
+    return light;
 }
 
 vec3 get_indirect_light_rt(
