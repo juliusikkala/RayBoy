@@ -109,38 +109,6 @@ vec3 gather_indirect_light_rt(
         indirect_specular = mix(vec3(1), mat.color.rgb, mat.metallic) * texelFetch(rt_reflection, ivec2(gl_FragCoord.xy)+best_off, 0).rgb;
     }
 
-    /*
-    if(REFRACTION_RAY_COUNT > 0 && pc.disable_rt_refraction == 0)
-    {
-        indirect_diffuse *= 1.0 - mat.transmittance;
-        if(mat.transmittance.r != 0.0f)
-        {
-            bool hit = false;
-            indirect_diffuse = refraction_ray(
-                position,
-                refract(
-                    refract(-view, mat.normal, mat.ior_before/mat.ior_after),
-                    normal,
-                    mat.ior_after/mat.ior_before
-                ),
-                mat.color.rgb,
-                0.2,
-                hit
-            );
-            if(!hit)
-            {
-                indirect_diffuse *= sample_cubemap(environment_indices.x, -view, 0);
-            }
-            else
-            {
-                // FUDGE
-                indirect_diffuse *= pow(mat.color.rgb, vec3(2));
-            }
-        }
-    }
-    */
-
-    //return indirect_diffuse + correct_specular;
     return indirect_diffuse + indirect_specular;
 }
 

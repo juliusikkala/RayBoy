@@ -22,6 +22,7 @@ json options::serialize() const
     j["gb_color"] = gb_color;
     j["scene"] = scene;
     j["accumulation"] = accumulation;
+    j["secondary_shadows"] = secondary_shadows;
     return j;
 }
 
@@ -55,10 +56,11 @@ bool options::deserialize(const json& j)
         reflection_rays = j.value("reflection_rays", 1);
         refraction_rays = j.value("refraction_rays", 1);
         display_index = j.value("display_index", -1);
-        mode = j.value("mode", "plain");
+        mode = j.value("mode", "fancy");
         gb_color = j.value("gb_color", "atomic-purple");
         scene = j.value("scene", "white_room");
-        accumulation = j.value("accumulation", 1);
+        accumulation = j.value("accumulation", -1);
+        secondary_shadows = j.value("secondary_shadows", false);
     }
     catch(...)
     {

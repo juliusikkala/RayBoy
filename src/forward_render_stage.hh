@@ -20,6 +20,7 @@ public:
         unsigned reflection_rays = 1;
         unsigned refraction_rays = 0;
         float accumulation_ratio = 0.1;
+        bool secondary_shadows = false;
     };
 
     forward_render_stage(
@@ -109,6 +110,8 @@ private:
     sampler brdf_integration_sampler;
     sampler buffer_sampler;
     timer stage_timer;
+    gpu_buffer accumulation_data;
+    uint64_t history_frames;
 };
 
 #endif

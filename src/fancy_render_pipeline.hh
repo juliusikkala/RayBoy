@@ -22,6 +22,7 @@ public:
         unsigned reflection_rays = 1;
         unsigned refraction_rays = 1;
         float accumulation_ratio = 0.1;
+        bool secondary_shadows = false;
     };
 
     fancy_render_pipeline(

@@ -18,6 +18,10 @@ struct push_constants
     uint32_t camera_id;
     uint32_t disable_rt_reflection;
     uint32_t disable_rt_refraction;
+};
+
+struct accumulation_data_buffer
+{
     float accumulation_ratio;
 };
 
@@ -46,7 +50,9 @@ forward_render_stage::forward_render_stage(
         ctx, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
         VK_SAMPLER_MIPMAP_MODE_NEAREST,
         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1, 0, 0
-    )
+    ),
+    accumulation_data(ctx, sizeof(accumulation_data_buffer)),
+    history_frames(0)
 {
     init_depth_pre_pass(depth_pre_pass, s, depth_target, VK_IMAGE_LAYOUT_UNDEFINED);
     init_forward_pass(default_raster, s, color_target, depth_target);
@@ -84,11 +90,6 @@ forward_render_stage::forward_render_stage(
                 false
             );
         }
-        
-        if(opt.reflection_rays <= 1 && opt.refraction_rays <= 1)
-        {
-            this->opt.accumulation_ratio = 1.0f;
-        }
 
         init_gather_pass(rt.opaque_gather_pass, s, color_target, depth_target, true);
         init_gather_pass(rt.transparent_gather_pass, s, color_target, depth_target, false);
@@ -102,6 +103,7 @@ forward_render_stage::forward_render_stage(
         // Record command buffer
         VkCommandBuffer buf = graphics_commands();
         stage_timer.start(buf, i);
+        accumulation_data.upload(buf, i);
 
         if(opt.ray_tracing && (opt.reflection_rays >= 1 || opt.refraction_rays >= 1))
         {
@@ -204,6 +206,11 @@ void forward_render_stage::set_camera(entity cam_id)
 
 void forward_render_stage::update_buffers(uint32_t image_index)
 {
+    history_frames++;
+    float accumulation_ratio = max(1.0f/history_frames, opt.accumulation_ratio);
+    accumulation_data.update(image_index, accumulation_data_buffer{
+        accumulation_ratio
+    });
 }
 
 void forward_render_stage::init_depth_pre_pass(
@@ -413,6 +420,7 @@ void forward_render_stage::init_generate_pass(
     bindings.push_back({11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     bindings.push_back({12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     bindings.push_back({13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    bindings.push_back({14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
     gfx_params.attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     gfx_params.attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -448,6 +456,7 @@ void forward_render_stage::init_generate_pass(
             gp.set_descriptor(i, 12, {rt.transparent_normal->get_image_view(j)}, {buffer_sampler.get()});
             gp.set_descriptor(i, 13, {rt.transparent_accumulation->get_image_view(j)}, {buffer_sampler.get()});
         }
+        gp.set_descriptor(i, 14, {accumulation_data[i]});
     }
 }
 
@@ -551,7 +560,7 @@ void forward_render_stage::draw_entities(
     int ray_traced,
     int transparent
 ){
-    push_constants pc = {0, 0, 0, 0, opt.accumulation_ratio};
+    push_constants pc = {0, 0, 0, 0};
     s.get_ecs().foreach([&](entity id, model& m, visible&, struct ray_traced* rt){
         for(size_t i = 0; i < m.group_count(); ++i)
         {

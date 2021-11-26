@@ -181,13 +181,13 @@ void gui::update()
                             unsigned value;
                         } shadow_options[] = {
                             {"Off", 0},
-                            {"Lowest (1 ray, sharp edge)", 1},
-                            {"Low (2 rays, soft & very noisy)", 2},
-                            {"Medium (4 rays, soft & noisy)", 4},
-                            {"High (8 rays, soft & slightly noisy)", 8},
-                            {"Highest (16 rays, soft)", 16},
-                            {"Lagfest (32 rays, soft)", 32},
-                            {"Bullshot mode (64 rays, soft)", 64}
+                            {"Lowest (1 ray)", 1},
+                            {"Low (2 rays)", 2},
+                            {"Medium (4 rays)", 4},
+                            {"High (8 rays)", 8},
+                            {"Highest (16 rays)", 16},
+                            {"Lagfest (32 rays)", 32},
+                            {"Bullshot mode (64 rays)", 64}
                         };
                         for(auto [name, value]: shadow_options)
                         {
@@ -202,6 +202,14 @@ void gui::update()
                         }
                         ImGui::EndMenu();
                     }
+                    if(ImGui::MenuItem("Secondary shadows", NULL, opts->secondary_shadows))
+                    {
+                        opts->secondary_shadows = !opts->secondary_shadows;
+                        SDL_Event e;
+                        e.type = SDL_USEREVENT;
+                        e.user.code = SET_RT_OPTION;
+                        SDL_PushEvent(&e);
+                    }
                     if(ImGui::BeginMenu("Reflection quality"))
                     {
                         static constexpr struct {
@@ -209,13 +217,13 @@ void gui::update()
                             unsigned value;
                         } reflection_options[] = {
                             {"Off", 0},
-                            {"Lowest (1 ray, sharp reflections only)", 1},
-                            {"Low (2 rays, all reflections, very noisy)", 2},
-                            {"Medium (4 rays, all reflections, very noisy)", 4},
-                            {"High (8 rays, all reflections, very noisy)", 8},
-                            {"Highest (16 rays, all reflections, very noisy)", 16},
-                            {"Lagfest (32 rays, all reflections, noisy)", 32},
-                            {"Bullshot mode (64 rays, all reflections, slightly noisy)", 64}
+                            {"Lowest (1 ray)", 1},
+                            {"Low (2 rays)", 2},
+                            {"Medium (4 rays)", 4},
+                            {"High (8 rays)", 8},
+                            {"Highest (16 rays)", 16},
+                            {"Lagfest (32 rays)", 32},
+                            {"Bullshot mode (64 rays)", 64}
                         };
                         for(auto [name, value]: reflection_options)
                         {
@@ -238,7 +246,6 @@ void gui::update()
                             const char* name;
                             unsigned value;
                         } refraction_options[] = {
-                            {"Off", 0},
                             {"Lowest (1 ray)", 1},
                             {"Low (2 rays)", 2},
                             {"Medium (4 rays)", 4},
@@ -264,12 +271,15 @@ void gui::update()
                     {
                         static constexpr struct {
                             const char* name;
-                            unsigned value;
+                            int value;
                         } accumulation_options[] = {
+                            {"Auto (based on ray counts)", -1},
                             {"Off (noisy)", 0},
-                            {"Fast (noisy but quick)", 1},
+                            {"Short (noisy)", 1},
                             {"Medium (middle road)", 2},
-                            {"Slow (noise-free but slow)", 3}
+                            {"Long (noise-free)", 3},
+                            {"Very long", 4},
+                            {"Outer space", 8}
                         };
                         for(auto [name, value]: accumulation_options)
                         {

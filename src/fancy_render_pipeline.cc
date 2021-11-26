@@ -101,7 +101,8 @@ void fancy_render_pipeline::reset()
         opt.shadow_rays,
         opt.reflection_rays,
         opt.refraction_rays,
-        opt.accumulation_ratio
+        opt.accumulation_ratio,
+        opt.secondary_shadows
     };
     forward_stage.reset(new forward_render_stage(
         *ctx,

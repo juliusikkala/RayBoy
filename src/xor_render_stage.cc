@@ -18,13 +18,14 @@ struct uniform_buffer
 }
 
 xor_render_stage::xor_render_stage(context& ctx, render_target& target)
-:   render_stage(ctx), xor_pipeline(ctx), uniforms(ctx, sizeof(uniform_buffer)),
+:   render_stage(ctx), xor_pipeline(ctx),
+    uniforms(ctx, sizeof(uniform_buffer)),
     stage_timer(ctx, "xor_render_stage")
 {
     // Create pipeline
     xor_pipeline.init(
         sizeof(xor_comp_shader_binary), xor_comp_shader_binary,
-        ctx.get_image_count(), 
+        ctx.get_image_count(),
         {
             {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
             {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},

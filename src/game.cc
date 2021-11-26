@@ -17,9 +17,18 @@ float deadzone(float value, float dz)
     return sign(value)*magnitude;
 }
 
-float calc_accumulation_ratio(int accumulation)
-{
-    return 0.5f/(accumulation*accumulation+1);
+float calc_accumulation_ratio(
+    const options& opt
+){
+    if(opt.accumulation < 0)
+    {
+        int rays = opt.reflection_rays;
+        if(opt.gb_color == "atomic-purple")
+            rays = min(opt.reflection_rays, opt.refraction_rays*2);
+        rays = max(rays, 1);
+        return float(rays)/256.0f;
+    }
+    return 1.0f/(2.0f*opt.accumulation*opt.accumulation+1);
 }
 
 void handle_emulator_input(emulator& emu, const SDL_Event& event)
@@ -501,10 +510,11 @@ void game::create_pipeline()
             opt.shadow_rays,
             opt.reflection_rays,
             opt.gb_color == "atomic-purple" ? opt.refraction_rays : 0,
-            calc_accumulation_ratio(opt.accumulation)
+            calc_accumulation_ratio(opt),
+            opt.secondary_shadows
         };
         model* screen_model = ecs_scene.get<model>(console_data.entities["Screen"]);
-        material* screen_mat = &(*screen_model)[3].mat;
+        material* screen_mat = &(*screen_model)[0].mat;
         pipeline.reset(new fancy_render_pipeline(*gfx_ctx, ecs_scene, screen_mat, *emu, fancy_options));
         emu->set_audio_mode(
             ecs_scene.get<transformable>(console_data.entities["Speaker"])
@@ -527,12 +537,14 @@ void game::refresh_pipeline_options()
     if(auto* ptr = dynamic_cast<fancy_render_pipeline*>(pipeline.get()))
     {
         fancy_render_pipeline::options fancy_options = {
-            opt.resolution_scaling, (VkSampleCountFlagBits)opt.msaa_samples,
+            opt.resolution_scaling,
+            (VkSampleCountFlagBits)opt.msaa_samples,
             gfx_ctx->get_device().supports_ray_tracing && opt.ray_tracing,
             opt.shadow_rays,
             opt.reflection_rays,
             opt.gb_color == "atomic-purple" ? opt.refraction_rays : 0,
-            calc_accumulation_ratio(opt.accumulation)
+            calc_accumulation_ratio(opt),
+            opt.secondary_shadows
         };
         ptr->set_options(fancy_options);
     }

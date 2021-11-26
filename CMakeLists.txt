@@ -31,7 +31,6 @@ set(shader_src
     src/xor.comp
     src/forward.vert
     src/forward.frag
-    src/forward_rt.frag
     src/tonemap.comp
     src/tonemap_msaa.comp
     src/emulator_transform.comp
@@ -45,7 +44,6 @@ set(shader_binary
     xor.comp.h
     forward.vert.h
     forward.frag.h
-    forward_rt.frag.h
     tonemap.comp.h
     tonemap_msaa.comp.h
     emulator_transform.comp.h

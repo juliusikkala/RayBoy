@@ -90,56 +90,67 @@ vec3 unproject_depth(float depth, vec2 uv, in camera cam)
 }
 
 material sample_material(material_spec spec, bool front_facing, vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
-{
-    material mat;
-    mat.color = spec.color_factor;
-    if(spec.textures.x != -1)
-    {
-        vec4 tex_col = texture(textures[nonuniformEXT(spec.textures.x)], uv);
-        tex_col.rgb = inverse_srgb_correction(tex_col.rgb);
-        mat.color *= tex_col;
-    }
-
-    vec2 mr = spec.metallic_roughness_normal_ior_factors.xy;
-    if(spec.textures.y != -1)
-        mr *= texture(textures[nonuniformEXT(spec.textures.y)], uv).bg;
-    mat.metallic = mr.x;
-    mat.roughness = mr.y;
-    mat.roughness2 = mat.roughness * mat.roughness;
-
-    mat.ior_after = front_facing ? spec.metallic_roughness_normal_ior_factors.w : 1.0;
-    mat.ior_before = front_facing ? 1.0 : spec.metallic_roughness_normal_ior_factors.w;
-    mat.f0 = (mat.ior_after - mat.ior_before)/(mat.ior_after + mat.ior_before);
-    mat.f0 *= mat.f0;
-
-    if(spec.textures.z != -1)
-    {
-        mat3 tbn = mat3(
-            normalize(tangent),
-            normalize(bitangent),
-            normalize(normal)
-        );
-        vec3 ts_normal = texture(textures[nonuniformEXT(spec.textures.z)], uv).xyz * 2.0f - 1.0f;
-        ts_normal.xy *= spec.metallic_roughness_normal_ior_factors.z;
-        mat.normal = normalize(tbn * ts_normal);
-    }
-    else mat.normal = normalize(normal);
-
-    mat.normal = front_facing ? mat.normal : -mat.normal;
-
-    mat.emission = spec.emission_transmittance_factors.rgb;
-    if(spec.textures.w != -1)
-    {
-        vec3 tex_col = texture(textures[nonuniformEXT(spec.textures.w)], uv).rgb;
-        tex_col = inverse_srgb_correction(tex_col);
-        mat.emission *= tex_col;
-    }
-
-    mat.emission *= mat.color.a;
-    mat.transmittance = vec3(spec.emission_transmittance_factors.a);
-
+#define SAMPLE_TEXTURE(tex_id) texture(textures[nonuniformEXT(tex_id)], uv)
+#define SAMPLE_MATERIAL_IMPL \
+    material mat; \
+    mat.color = spec.color_factor; \
+    if(spec.textures.x != -1) \
+    { \
+        vec4 tex_col = SAMPLE_TEXTURE(spec.textures.x); \
+        tex_col.rgb = inverse_srgb_correction(tex_col.rgb); \
+        mat.color *= tex_col; \
+    } \
+ \
+    vec2 mr = spec.metallic_roughness_normal_ior_factors.xy; \
+    if(spec.textures.y != -1) \
+        mr *= SAMPLE_TEXTURE(spec.textures.y).bg; \
+    mat.metallic = mr.x; \
+    mat.roughness = mr.y; \
+    mat.roughness2 = mat.roughness * mat.roughness; \
+ \
+    mat.ior_after = front_facing ? spec.metallic_roughness_normal_ior_factors.w : 1.0; \
+    mat.ior_before = front_facing ? 1.0 : spec.metallic_roughness_normal_ior_factors.w; \
+    mat.f0 = (mat.ior_after - mat.ior_before)/(mat.ior_after + mat.ior_before); \
+    mat.f0 *= mat.f0; \
+ \
+    if(spec.textures.z != -1) \
+    { \
+        mat3 tbn = mat3( \
+            normalize(tangent), \
+            normalize(bitangent), \
+            normalize(normal) \
+        ); \
+        vec3 ts_normal = SAMPLE_TEXTURE(spec.textures.z).xyz * 2.0f - 1.0f; \
+        ts_normal.xy *= spec.metallic_roughness_normal_ior_factors.z; \
+        mat.normal = normalize(tbn * ts_normal); \
+    } \
+    else mat.normal = normalize(normal); \
+ \
+    mat.normal = front_facing ? mat.normal : -mat.normal; \
+ \
+    mat.emission = spec.emission_transmittance_factors.rgb; \
+    if(spec.textures.w != -1) \
+    { \
+        vec3 tex_col = SAMPLE_TEXTURE(spec.textures.w).rgb; \
+        tex_col = inverse_srgb_correction(tex_col); \
+        mat.emission *= tex_col; \
+    } \
+ \
+    mat.emission *= mat.color.a; \
+    mat.transmittance = vec3(spec.emission_transmittance_factors.a); \
+ \
     return mat;
+{
+    SAMPLE_MATERIAL_IMPL
 }
+#undef SAMPLE_TEXTURE
+
+material sample_material_lod(material_spec spec, bool front_facing, vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent, float lod)
+#define SAMPLE_TEXTURE(tex_id) textureLod(textures[nonuniformEXT(tex_id)], uv, lod)
+{
+    SAMPLE_MATERIAL_IMPL
+}
+#undef SAMPLE_TEXTURE
 
 void get_point_light_info(
     point_light l,
