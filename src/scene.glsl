@@ -178,7 +178,7 @@ void get_point_light_info(
 }
 
 void get_directional_light_info(
-    directional_light l, 
+    directional_light l,
     out vec3 dir,
     out vec3 color
 ){

@@ -223,9 +223,11 @@ void game::load_scene(const std::string& name)
         scene_data.textures.emplace_back(lightmap_ptr);
     }
 
-    for(const auto& [name, id]: scene_data.entities)
+    for(const auto& [obj_name, id]: scene_data.entities)
     {
         ecs_scene.attach(id, scene_entity{});
+        if(name == "undercover")
+            ecs_scene.attach(id, ray_traced{true, false, false});
     }
 
     ecs_scene([&](entity id, console_entity* ce, scene_entity* se, model& m){
@@ -569,7 +571,7 @@ void game::update_gbc_material()
 
     if(opt.gb_color == "grape")
     {
-        color = vec3(0.07, 0, 0.25);
+        color = vec3(0.07, 0, 0.25)*0.5f;
     }
     else if(opt.gb_color == "teal")
     {
@@ -577,15 +579,15 @@ void game::update_gbc_material()
     }
     else if(opt.gb_color == "kiwi")
     {
-        color = vec3(0.2, 0.56, 0.0);
+        color = vec3(0.2, 0.56, 0.0)*0.5f;
     }
     else if(opt.gb_color == "berry")
     {
-        color = vec3(0.6, 0., 0.045);
+        color = vec3(0.6, 0., 0.045)*0.5f;
     }
     else if(opt.gb_color == "dandelion")
     {
-        color = vec3(0.7, 0.4, 0);
+        color = vec3(0.7, 0.4, 0)*0.5f;
     }
     else if(opt.gb_color == "atomic-purple")
     {
@@ -603,7 +605,7 @@ void game::update_gbc_material()
     }
     else if(opt.gb_color == "white")
     {
-        color = vec3(0.95);
+        color = vec3(0.85);
     }
 
     bool opaque = transmittance == 0.0f;

@@ -22,9 +22,11 @@ struct gltf_data
     void remove(ecs& e);
 };
 
+
 // Entity tag, used to mark all objects that export a custom property
 // called "outer_layer". Used to skip rasterizing internals of the Rayboy. 
 struct outer_layer {};
+struct gltf_name { std::string name; };
 
 gltf_data load_gltf(
     context& ctx,

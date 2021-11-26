@@ -327,6 +327,7 @@ void load_gltf_node(
 
     bool outer = node.extras.Has("outer_layer");
     if(outer) entities.attach(id, outer_layer{});
+    entities.attach(id, gltf_name{node.name});
 
     // Load child nodes
     for(int child_index: node.children)

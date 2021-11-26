@@ -401,9 +401,11 @@ void forward_render_stage::init_generate_pass(
     spec_entries.push_back({2, 2*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({4, 4*sizeof(uint32_t), sizeof(uint32_t)});
+    spec_entries.push_back({5, 5*sizeof(uint32_t), sizeof(uint32_t)});
     spec_data.push_back(opt.shadow_rays);
     spec_data.push_back(opt.reflection_rays);
     spec_data.push_back(opt.refraction_rays);
+    spec_data.push_back(opt.secondary_shadows ? 1 : 0);
 
     sd.fragment_specialization.mapEntryCount = spec_entries.size();
     sd.fragment_specialization.pMapEntries = spec_entries.data();
@@ -480,9 +482,11 @@ void forward_render_stage::init_gather_pass(
     spec_entries.push_back({3, 3*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({4, 4*sizeof(uint32_t), sizeof(uint32_t)});
     spec_entries.push_back({5, 5*sizeof(uint32_t), sizeof(uint32_t)});
+    spec_entries.push_back({6, 6*sizeof(uint32_t), sizeof(uint32_t)});
     spec_data.push_back(opt.shadow_rays);
     spec_data.push_back(opt.reflection_rays);
     spec_data.push_back(opt.refraction_rays);
+    spec_data.push_back(opt.secondary_shadows ? 1 : 0);
     spec_data.push_back(color_target->get_samples() != VK_SAMPLE_COUNT_1_BIT ? 1 : 0);
 
     sd.fragment_specialization.mapEntryCount = spec_entries.size();

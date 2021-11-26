@@ -18,7 +18,8 @@ layout(push_constant) uniform push_constant_buffer
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
 layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
 layout(constant_id = 4) const int REFRACTION_RAY_COUNT = 0;
-layout(constant_id = 5) const int MSAA_LOOKUP = 0;
+layout(constant_id = 5) const int SECONDARY_SHADOWS = 0;
+layout(constant_id = 6) const int MSAA_LOOKUP = 0;
 
 #include "rt.glsl"
 
@@ -152,7 +153,7 @@ void main()
         get_directional_light_info(directional_lights.array[i], light_dir, color);
         float terminator = smoothstep(-0.05, 0.0, dot(normal, light_dir));
         vec3 shadow = shadow_ray(position, position + light_dir*1e4);
-        lighting += terminator * brdf(color, color, light_dir, view_dir, mat);
+        lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
     }
 
     float alpha = 1.0f;

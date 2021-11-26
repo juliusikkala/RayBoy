@@ -17,6 +17,7 @@ layout(push_constant) uniform push_constant_buffer
 layout(constant_id = 2) const int SHADOW_RAY_COUNT = 0;
 layout(constant_id = 3) const int REFLECTION_RAY_COUNT = 0;
 layout(constant_id = 4) const int REFRACTION_RAY_COUNT = 0;
+layout(constant_id = 5) const int SECONDARY_SHADOWS = 0;
 
 #include "rt.glsl"
 

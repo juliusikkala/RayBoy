@@ -70,28 +70,123 @@ vec3 shadow_ray(vec3 start, vec3 end)
     vec3 dir = end - start;
     float len = length(dir);
     dir /= len;
-    rayQueryEXT rq;
-    rayQueryInitializeEXT(
-        rq,
-        tlas,
-        gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsOpaqueEXT|gl_RayFlagsSkipClosestHitShaderEXT,
-        1,
-        start,
-        1e-4,
-        dir,
-        len
-    );
 
     vec3 visibility = vec3(1);
 
-    rayQueryProceedEXT(rq);
+    if(REFRACTION_RAY_COUNT == 0)
+    { // Without any refractions, we can do shadows the easy and fast way.
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq,
+            tlas,
+            gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsOpaqueEXT|gl_RayFlagsSkipClosestHitShaderEXT,
+            1,
+            start,
+            1e-4,
+            dir,
+            len
+        );
 
-    if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
-    {
-        visibility *= vec3(0);
+        rayQueryProceedEXT(rq);
+
+        if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+        {
+            visibility = vec3(0);
+        }
+    }
+    else
+    { // Well shit, this one's a doozy.
+        rayQueryEXT rq;
+        rayQueryInitializeEXT(
+            rq, tlas, gl_RayFlagsNoneEXT, 1, start, 1e-4, dir, len
+        );
+
+        float transmit_dist = 0;
+        vec3 transmit_color = vec3(1);
+        while(rayQueryProceedEXT(rq))
+        {
+            uint type = rayQueryGetIntersectionTypeEXT(rq, false);
+            bool front = rayQueryGetIntersectionFrontFaceEXT(rq, false);
+            if(type == gl_RayQueryCandidateIntersectionTriangleEXT)
+            {
+                uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, false);
+                uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, false);
+                vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, false);
+                instance i = instances.array[nonuniformEXT(instance_id)];
+                vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+                material mat = sample_material(
+                    i.material,
+                    front,
+                    vd.uv.xy,
+                    vd.normal,
+                    vd.tangent,
+                    vd.bitangent
+                );
+
+                // Can't apply fresnel and expect it to work cause we aren't
+                // refracting correctly... So this is the next best thing.
+                float cos_d = abs(dot(-dir, mat.normal));
+                visibility *= mat.color.rgb * mat.transmittance;
+                transmit_color = mat.color.rgb;
+
+                float t = rayQueryGetIntersectionTEXT(rq, false);
+                transmit_dist += front ? -t : t;
+            }
+        }
+
+        if(transmit_dist < 0) transmit_dist += len;
+        // RAYBOY HACK: Hervantavakio
+        visibility *= pow(transmit_color, vec3(transmit_dist*2000));
+
+        // If there's a hit, that means we hit something opaque since everything
+        // transparent would've been evaluated in the loop and left uncommitted.
+        if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+        {
+            visibility = vec3(0);
+        }
     }
 
     return visibility;
+}
+
+vec3 shade_point_rt(
+    vec3 position,
+    vec3 view_dir,
+    vec3 surface_normal,
+    ivec3 environment_indices,
+    vec2 lightmap_uv,
+    in material mat
+){
+    vec3 lighting = get_indirect_light(
+        position,
+        environment_indices,
+        mat.normal,
+        view_dir,
+        mat,
+        lightmap_uv
+    ) + mat.emission;
+
+    for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_point_light_info(point_lights.array[i], position, light_dir, color);
+        // Hack to prevent normal map weirdness at grazing angles
+        float terminator = smoothstep(-0.05, 0.0, dot(surface_normal, light_dir));
+        vec3 shadow = shadow_ray(position, point_lights.array[i].pos_falloff.xyz);
+        lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
+    }
+
+    for(uint i = 0; i < DIRECTIONAL_LIGHT_COUNT; ++i)
+    {
+        vec3 light_dir;
+        vec3 color;
+        get_directional_light_info(directional_lights.array[i], light_dir, color);
+        float terminator = smoothstep(-0.05, 0.0, dot(surface_normal, light_dir));
+        vec3 shadow = shadow_ray(position, position + light_dir*1e4);
+        lighting += terminator * shadow * brdf(color, color, light_dir, view_dir, mat);
+    }
+    return lighting;
 }
 
 // Mostly for debugging purposes.
@@ -148,7 +243,10 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit, float lo
             vd.bitangent,
             lod_bias
         );
-        color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+        if(SECONDARY_SHADOWS == 0)
+            color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+        else
+            color = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
     }
 
     return color;
@@ -342,7 +440,13 @@ vec3 refraction_path(
             // RAYBOY HACK: Color the light slightly as it passes through the material.
             if(!front) tint *= pow(mat.color.rgb, vec3(t*500));
 
-            color += light_tint * tint * shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+            vec3 shade;
+            if(SECONDARY_SHADOWS == 0)
+                shade = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+            else
+                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+
+            color += light_tint * tint * shade;
             if(mat.transmittance.r == 0.0f)
             {
                 break;
