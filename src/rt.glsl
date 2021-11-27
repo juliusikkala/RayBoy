@@ -528,7 +528,10 @@ vec3 evaluate_reflection(
             if(!hit)
                 refl_color = sample_cubemap(environment_indices.x, dir, 0);
             // Yeah, the clamping is arbitrary. It removes some fireflies.
-            indirect_specular += refl_color * clamp(ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(2));
+            indirect_specular += clamp(
+                refl_color * clamp(ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(2)),
+                vec3(0), vec3(5)
+            );
         }
         indirect_specular /= REFLECTION_RAY_COUNT;
     }
