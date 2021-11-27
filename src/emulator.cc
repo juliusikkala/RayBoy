@@ -95,10 +95,9 @@ emulator::emulator(audio& a)
 {
     audio_handle = a.add_source(audio_output);
     active_framebuffer.resize(160*144, 0xFFFFFFFF);
-    finished_framebuffer.resize(160*144, 0xFFFFFFFF);
-    cur_faded_framebuffer.resize(160*144, vec4(1));
+    drive_framebuffer.resize(160*144, vec4(1));
+    faded_framebuffer.resize(160*144, vec4(1));
     prev_faded_framebuffer.resize(160*144, vec4(1));
-    present_faded_framebuffer.resize(160*144, 0xFFFFFFFF);
     for(bool& state: button_states) state = false;
 }
 
@@ -126,7 +125,6 @@ void emulator::reset()
         GB_reset(&gb);
     }
     memset(active_framebuffer.data(), 0xFF, sizeof(uint32_t)*active_framebuffer.size());
-    memset(finished_framebuffer.data(), 0xFF, sizeof(uint32_t)*finished_framebuffer.size());
     // Faded framebuffer is intentionally not cleared here!
     age_ticks = 0;
 }
@@ -221,14 +219,14 @@ void emulator::lock_framebuffer()
     mutex.lock();
 }
 
-uint32_t* emulator::get_framebuffer_data()
+const vec4* emulator::get_framebuffer_data()
 {
     if(fade_enabled)
     {
         age_framebuffer();
-        return present_faded_framebuffer.data();
+        return faded_framebuffer.data();
     }
-    else return finished_framebuffer.data();
+    return drive_framebuffer.data();
 }
 
 void emulator::unlock_framebuffer()
@@ -353,19 +351,23 @@ void emulator::age_framebuffer()
     vec3 up_mix_ratio = pow(vec3(0.5), age/vec3(0.0052, 0.0042, 0.0028));
     vec3 down_mix_ratio = pow(vec3(0.5), age/vec3(0.0076, 0.0076, 0.006));
 
-    for(unsigned y = 0; y < 144; ++y)
-    for(unsigned x = 0; x < 160; ++x)
+    for(unsigned i = 0; i < 160 * 144; ++i)
     {
-        unsigned index = y*160+x;
-        vec4 prev = prev_faded_framebuffer[index];
-        uint32_t drive_uint = finished_framebuffer[index];
-        vec4 drive = unpackUnorm4x8(drive_uint);
+        vec4 prev = prev_faded_framebuffer[i];
+        vec4 drive = drive_framebuffer[i];
 
-        vec3 ratio = mix(down_mix_ratio, up_mix_ratio, vec3(greaterThan(drive, prev)));
-        vec4 mixed = mix(drive, prev, vec4(ratio, 1));
-        cur_faded_framebuffer[index] = mixed;
+        vec3 ratio = down_mix_ratio;
+        if(drive.r > prev.r) ratio.r = up_mix_ratio.r;
+        if(drive.g > prev.g) ratio.g = up_mix_ratio.g;
+        if(drive.b > prev.b) ratio.b = up_mix_ratio.b;
 
-        present_faded_framebuffer[index] = packUnorm4x8(mixed);
+        // I don't understand why, but using SSE makes this particular thing
+        // like 10 times slower than breaking it up like this. Maybe it breaks
+        // some compiler optimizations here?
+        faded_framebuffer[i].r = mix(drive.r, prev.r, ratio.r);
+        faded_framebuffer[i].g = mix(drive.g, prev.g, ratio.g);
+        faded_framebuffer[i].b = mix(drive.b, prev.b, ratio.b);
+        faded_framebuffer[i].a = 1.0f;
     }
 }
 
@@ -384,14 +386,12 @@ void emulator::handle_vblank(GB_gameboy_t *gb)
         self.age_framebuffer();
         memcpy(
             self.prev_faded_framebuffer.data(),
-            self.cur_faded_framebuffer.data(),
-            self.cur_faded_framebuffer.size()*sizeof(vec4)
+            self.faded_framebuffer.data(),
+            self.faded_framebuffer.size()*sizeof(vec4)
         );
     }
     self.age_ticks = 0;
-    memcpy(
-        self.finished_framebuffer.data(),
-        self.active_framebuffer.data(),
-        self.active_framebuffer.size()*sizeof(uint32_t)
-    );
+
+    for(unsigned i = 0; i < 160 * 144; ++i)
+        self.drive_framebuffer[i] = unpackUnorm4x8(self.active_framebuffer[i]);
 }

@@ -568,6 +568,7 @@ void game::update_gbc_material()
     vec3 color = vec3(0);
     float metallic = 0.0f;
     float transmittance = 0.0f;
+    float ior = 1.54f;
 
     if(opt.gb_color == "grape")
     {
@@ -624,6 +625,7 @@ void game::update_gbc_material()
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        vg.mat.ior = ior;
         // I'm so sorry...
         const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
     }
@@ -633,6 +635,7 @@ void game::update_gbc_material()
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        vg.mat.ior = ior;
         // I'm so sorry...
         const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
     }
@@ -642,6 +645,7 @@ void game::update_gbc_material()
         vg.mat.color_factor = vec4(color, 1);
         vg.mat.metallic_factor = metallic;
         vg.mat.transmittance = transmittance;
+        vg.mat.ior = ior;
         // I'm so sorry...
         const_cast<mesh*>(vg.mesh)->set_opaque(opaque);
     }

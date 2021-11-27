@@ -57,7 +57,7 @@ public:
     void set_framebuffer_fade(bool enable);
 
     void lock_framebuffer();
-    uint32_t* get_framebuffer_data();
+    const vec4* get_framebuffer_data();
     void unlock_framebuffer();
 
 private:
@@ -81,10 +81,9 @@ private:
     emulator_audio audio_output;
     SoLoud::handle audio_handle;
     std::vector<uint32_t> active_framebuffer;
-    std::vector<uint32_t> finished_framebuffer;
-    std::vector<vec4> cur_faded_framebuffer;
+    std::vector<vec4> drive_framebuffer;
+    std::vector<vec4> faded_framebuffer;
     std::vector<vec4> prev_faded_framebuffer;
-    std::vector<uint32_t> present_faded_framebuffer;
 
     bool button_states[8];
 

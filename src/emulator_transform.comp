@@ -6,7 +6,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 layout(binding = 0, rgba32f) uniform writeonly image2D image_output;
 
 layout(binding = 1) buffer uniform_buffer {
-    uint pixels[];
+    vec4 pixels[];
 } input_data;
 
 layout(binding = 2, rgba32f) uniform readonly image2D color_lut;
@@ -39,8 +39,7 @@ void main()
     {
         ivec2 i = p*pc.input_size/output_size;
     
-        uint pixel = input_data.pixels[i.y * pc.input_size.x + i.x];
-        vec4 driven_color = unpackUnorm4x8(pixel);
+        vec4 driven_color = input_data.pixels[i.y * pc.input_size.x + i.x];
         vec4 lcd_color = vec4(0);
         if(pc.use_color_mapping != 0)
         {

@@ -27,7 +27,7 @@ emulator_render_stage::emulator_render_stage(
     transform_pipeline(ctx),
     image_buffer(
         ctx,
-        sizeof(uint32_t)*emu.get_screen_size().x*emu.get_screen_size().y,
+        sizeof(vec4)*emu.get_screen_size().x*emu.get_screen_size().y,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         false
     ),
