@@ -62,7 +62,7 @@ fs::path get_writable_path()
     static fs::path path;
     if(!has_path)
     {
-        char* path_str = SDL_GetPrefPath("rinkkaaj.at", "RayBoy");
+        char* path_str = SDL_GetPrefPath("jji.fi", "RayBoy");
         path = path_str;
         SDL_free(path_str);
         path = path.make_preferred();

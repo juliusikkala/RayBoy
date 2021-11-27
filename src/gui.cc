@@ -453,7 +453,7 @@ void gui::menu_graphics()
             };
             for(auto [name, id]: color_options)
             {
-                if(!opts->ray_tracing && !strcmp(id, "atomic-purple"))
+                if((!opts->ray_tracing || !ctx->get_device().supports_ray_tracing) && !strcmp(id, "atomic-purple"))
                     continue;
 
                 if(ImGui::MenuItem(name, NULL, opts->gb_color == id))
