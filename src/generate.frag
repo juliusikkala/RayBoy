@@ -88,8 +88,8 @@ void main()
     float accumulation_ratio = ad.accumulation_ratio;
 
     vec3 proj_pos = prev_proj_pos.xyz/prev_proj_pos.w;
-    proj_pos.xy = (proj_pos.xy*0.5+0.5) * textureSize(prev_depth, 0).xy;
-    ivec2 sample_pos = ivec2(proj_pos.xy);
+    vec2 proj_uv = proj_pos.xy*0.5+0.5;
+    ivec2 sample_pos = ivec2(proj_uv * textureSize(prev_depth, 0).xy);
     vec3 new_view_normal = mat3(cam.view) * normalize(normal);
 
     if(
@@ -111,11 +111,11 @@ void main()
             )/M_PI*2, 0.001f, 1.0f);
             accumulation_ratio = mix(1, accumulation_ratio, pow(angle, 2.0f/max(mat.roughness, 1e-2)));
 
+            float new_depth = linearize_depth(proj_pos.z*2.0f-1.0f, cam.clip_info.xyz);
             float old_depth = texelFetch(prev_depth, sample_pos, 0).r;
-            if(abs(old_depth/proj_pos.z-1.0f) > 1e-3)
-            {
+            old_depth = linearize_depth(old_depth*2.0f-1.0f, cam.clip_info.xyz);
+            if(abs(old_depth-new_depth) > 1e-3)
                 accumulation_ratio = 1.0f;
-            }
             out_reflection = vec4(mix(old_reflection, passed_light, accumulation_ratio), 1);
         }
     }

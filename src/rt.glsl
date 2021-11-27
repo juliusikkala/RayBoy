@@ -98,7 +98,7 @@ vec3 shadow_ray(vec3 start, vec3 end)
     { // Well shit, this one's a doozy.
         rayQueryEXT rq;
         rayQueryInitializeEXT(
-            rq, tlas, gl_RayFlagsNoneEXT, 1, start, 1e-4, dir, len
+            rq, tlas, gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsNoneEXT|gl_RayFlagsSkipClosestHitShaderEXT, 1, start, 1e-4, dir, len
         );
 
         float transmit_dist = 0;
@@ -141,9 +141,7 @@ vec3 shadow_ray(vec3 start, vec3 end)
         // If there's a hit, that means we hit something opaque since everything
         // transparent would've been evaluated in the loop and left uncommitted.
         if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
-        {
             visibility = vec3(0);
-        }
     }
 
     return visibility;
@@ -447,14 +445,9 @@ vec3 refraction_path(
                 shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
 
             color += light_tint * tint * shade;
-            if(mat.transmittance.r == 0.0f)
-            {
+            tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb * mat.transmittance;
+            if(all(lessThan(tint, vec3(1e-4))))
                 break;
-            }
-            else
-            {
-                tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb;
-            }
 
             start = vd.pos;
             float ior_ratio = mat.ior_before/mat.ior_after;
@@ -535,7 +528,7 @@ vec3 evaluate_reflection(
             if(!hit)
                 refl_color = sample_cubemap(environment_indices.x, dir, 0);
             // Yeah, the clamping is arbitrary. It removes some fireflies.
-            indirect_specular += clamp(refl_color * ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(5));
+            indirect_specular += refl_color * clamp(ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(2));
         }
         indirect_specular /= REFLECTION_RAY_COUNT;
     }
@@ -569,8 +562,7 @@ vec3 evaluate_refraction(
             vec3 h = tbn * sample_ggx_vndf_tangent(tan_view, mat.roughness2, u);
             vec3 dir = refract(-view, h, ior_ratio);
             vec3 refr_color = refraction_path(pos, h, dir, mat, environment_indices, 0.05);
-            // Yeah, the clamping is arbitrary. It removes some fireflies.
-            light += clamp(refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat)), vec3(0), vec3(5));
+            light += refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat));
         }
         light /= REFRACTION_RAY_COUNT;
     }
