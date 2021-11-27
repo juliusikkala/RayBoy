@@ -153,16 +153,17 @@ vec3 shade_point_rt(
     vec3 surface_normal,
     ivec3 environment_indices,
     vec2 lightmap_uv,
-    in material mat
+    in material mat,
+    vec3 light_tint
 ){
-    vec3 lighting = get_indirect_light(
+    vec3 lighting = light_tint * (get_indirect_light(
         position,
         environment_indices,
         mat.normal,
         view_dir,
         mat,
         lightmap_uv
-    ) + mat.emission;
+    ) + mat.emission);
 
     for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
     {
@@ -244,7 +245,7 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit, float lo
         if(SECONDARY_SHADOWS == 0)
             color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
         else
-            color = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+            color = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat, vec3(1));
     }
 
     return color;
@@ -440,11 +441,11 @@ vec3 refraction_path(
 
             vec3 shade;
             if(SECONDARY_SHADOWS == 0)
-                shade = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+                shade = light_tint * shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
             else
-                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat, light_tint);
 
-            color += light_tint * tint * shade;
+            color += tint * shade;
             tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb * mat.transmittance;
             if(all(lessThan(tint, vec3(1e-4))))
                 break;
