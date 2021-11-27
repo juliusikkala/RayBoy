@@ -91,6 +91,7 @@ game::game(const char* initial_rom)
     frame_start = std::chrono::steady_clock::now();
     load_options(opt);
     gfx_ctx.reset(new context(opt.window_size, opt.fullscreen, opt.vsync));
+    window_size = opt.window_size;
     audio_ctx.reset(new audio());
     ui.reset(new gui(*gfx_ctx, opt));
     emu.reset(new emulator(*audio_ctx));
@@ -331,6 +332,14 @@ bool game::handle_input()
             {
                 return false;
             }
+            if(event.key.keysym.sym == SDLK_F11 && event.type == SDL_KEYDOWN)
+            {
+                opt.fullscreen = !opt.fullscreen;
+                SDL_Event e;
+                e.type = SDL_USEREVENT;
+                e.user.code = gui::FULLSCREEN_TOGGLE;
+                SDL_PushEvent(&e);
+            }
             if(event.key.keysym.sym == SDLK_t && event.type == SDL_KEYDOWN)
             {
                 gfx_ctx->dump_timing();
@@ -363,8 +372,10 @@ bool game::handle_input()
                 event.window.event == SDL_WINDOWEVENT_RESIZED ||
                 event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED
             ){
-                opt.window_size = ivec2(event.window.data1, event.window.data2);
-                if(opt.window_size != gfx_ctx->get_size())
+                window_size = ivec2(event.window.data1, event.window.data2);
+                if(!opt.fullscreen)
+                    opt.window_size = window_size;
+                if(window_size != gfx_ctx->get_size())
                     need_swapchain_reset = true;
             }
             break;
@@ -386,7 +397,10 @@ bool game::handle_input()
             case gui::FULLSCREEN_TOGGLE:
                 gfx_ctx->set_fullscreen(opt.fullscreen);
                 if(!opt.fullscreen)
+                {
                     gfx_ctx->set_size(opt.window_size);
+                    window_size = opt.window_size;
+                }
                 need_swapchain_reset = true;
                 break;
             case gui::VSYNC_TOGGLE:
@@ -470,7 +484,7 @@ void game::render()
     {
         need_swapchain_reset = false;
         if(!opt.fullscreen)
-            gfx_ctx->set_size(opt.window_size);
+            gfx_ctx->set_size(window_size);
         gfx_ctx->reset_swapchain();
         need_pipeline_reset = true;
     }

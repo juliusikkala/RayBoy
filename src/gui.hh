@@ -30,7 +30,18 @@ public:
     void update();
 
 private:
+    void menu_file();
+    void menu_window();
+    void menu_graphics();
+    void menu_help();
+    void help_controls();
+    void help_license();
+    void help_about();
+
     bool show_menubar;
+    bool show_controls;
+    bool show_license;
+    bool show_about;
     context* ctx;
     options* opts;
 };

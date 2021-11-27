@@ -33,6 +33,7 @@ private:
 
     ecs ecs_scene;
     options opt;
+    ivec2 window_size;
     bool need_swapchain_reset;
     bool need_pipeline_reset;
     ecs_updater& updater;
