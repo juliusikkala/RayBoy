@@ -562,7 +562,7 @@ vec3 evaluate_refraction(
             vec3 h = tbn * sample_ggx_vndf_tangent(tan_view, mat.roughness2, u);
             vec3 dir = refract(-view, h, ior_ratio);
             vec3 refr_color = refraction_path(pos, h, dir, mat, environment_indices, 0.05);
-            light += refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat));
+            light += clamp(refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat)), vec3(0), vec3(5));
         }
         light /= REFRACTION_RAY_COUNT;
     }
