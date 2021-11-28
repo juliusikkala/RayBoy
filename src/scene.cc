@@ -524,7 +524,8 @@ void scene::init_rt()
     scratch_address = vkGetBufferDeviceAddress(
         ctx->get_device().logical_device,
         &scratch_info
-    ) + alignment - (build_size.buildScratchSize % alignment);
+    );
+    scratch_address = alignment - (scratch_address % alignment);
 }
 
 void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refresh)

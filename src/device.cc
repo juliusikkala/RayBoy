@@ -37,7 +37,6 @@ device::device(
     const std::vector<const char*>& validation_layers
 ){
     const char* device_extensions[] = {
-        VK_KHR_MAINTENANCE1_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
         VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -45,7 +44,7 @@ device::device(
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
     };
-    const uint32_t required_extension_count = 3;
+    const uint32_t required_extension_count = 2;
     const uint32_t rt_extension_count = required_extension_count + 4;
 
     // Find all physical devices
@@ -136,8 +135,7 @@ device::device(
     // Get features
     physical_device_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &vulkan12_features};
     vulkan12_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &sync2_features};
-    sync2_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR, &buffer_address_features};
-    buffer_address_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_ADDRESS_FEATURES_EXT, &rq_features};
+    sync2_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR, &rq_features};
     rq_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR, &as_features};
     as_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR, nullptr};
     vkGetPhysicalDeviceFeatures2(physical_device, &physical_device_features);
@@ -148,7 +146,7 @@ device::device(
     physical_device_features.features.samplerAnisotropy = VK_TRUE;
     vulkan12_features.timelineSemaphore = VK_TRUE;
     vulkan12_features.scalarBlockLayout = VK_TRUE;
-    buffer_address_features.bufferDeviceAddress = VK_TRUE;
+    vulkan12_features.bufferDeviceAddress = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
     rq_features.rayQuery = VK_TRUE;
     as_features.accelerationStructure = VK_TRUE;

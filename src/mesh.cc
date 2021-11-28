@@ -144,9 +144,9 @@ void mesh::rebuild_acceleration_structure()
         scratch_buffer
     };
     as_build_info.scratchData.deviceAddress = vkGetBufferDeviceAddress(
-        ctx->get_device().logical_device,
-        &scratch_info
-    ) + alignment - (build_size.buildScratchSize % alignment);
+        ctx->get_device().logical_device, &scratch_info
+    );
+    as_build_info.scratchData.deviceAddress = alignment - (as_build_info.scratchData.deviceAddress % alignment);
 
     vkres<VkBuffer> uncompact_blas_buffer = create_gpu_buffer(
         *ctx,
