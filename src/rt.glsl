@@ -98,7 +98,7 @@ vec3 shadow_ray(vec3 start, vec3 end)
     { // Well shit, this one's a doozy.
         rayQueryEXT rq;
         rayQueryInitializeEXT(
-            rq, tlas, gl_RayFlagsNoneEXT, 1, start, 1e-4, dir, len
+            rq, tlas, gl_RayFlagsTerminateOnFirstHitEXT|gl_RayFlagsNoneEXT|gl_RayFlagsSkipClosestHitShaderEXT, 1, start, 1e-4, dir, len
         );
 
         float transmit_dist = 0;
@@ -141,9 +141,7 @@ vec3 shadow_ray(vec3 start, vec3 end)
         // If there's a hit, that means we hit something opaque since everything
         // transparent would've been evaluated in the loop and left uncommitted.
         if(rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
-        {
             visibility = vec3(0);
-        }
     }
 
     return visibility;
@@ -155,16 +153,17 @@ vec3 shade_point_rt(
     vec3 surface_normal,
     ivec3 environment_indices,
     vec2 lightmap_uv,
-    in material mat
+    in material mat,
+    vec3 light_tint
 ){
-    vec3 lighting = get_indirect_light(
+    vec3 lighting = light_tint * (get_indirect_light(
         position,
         environment_indices,
         mat.normal,
         view_dir,
         mat,
         lightmap_uv
-    ) + mat.emission;
+    ) + mat.emission);
 
     for(uint i = 0; i < POINT_LIGHT_COUNT; ++i)
     {
@@ -246,7 +245,7 @@ vec3 reflection_ray(vec3 start, vec3 dir, float max_dist, out bool hit, float lo
         if(SECONDARY_SHADOWS == 0)
             color = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
         else
-            color = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+            color = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat, vec3(1));
     }
 
     return color;
@@ -442,19 +441,14 @@ vec3 refraction_path(
 
             vec3 shade;
             if(SECONDARY_SHADOWS == 0)
-                shade = shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+                shade = light_tint * shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
             else
-                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat, light_tint);
 
-            color += light_tint * tint * shade;
-            if(mat.transmittance.r == 0.0f)
-            {
+            color += tint * shade;
+            tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb * mat.transmittance;
+            if(all(lessThan(tint, vec3(1e-4))))
                 break;
-            }
-            else
-            {
-                tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb;
-            }
 
             start = vd.pos;
             float ior_ratio = mat.ior_before/mat.ior_after;
@@ -535,7 +529,10 @@ vec3 evaluate_reflection(
             if(!hit)
                 refl_color = sample_cubemap(environment_indices.x, dir, 0);
             // Yeah, the clamping is arbitrary. It removes some fireflies.
-            indirect_specular += clamp(refl_color * ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(5));
+            indirect_specular += clamp(
+                refl_color * clamp(ggx_vndf_attenuation(view, dir, mat), vec3(0), vec3(2)),
+                vec3(0), vec3(5)
+            );
         }
         indirect_specular /= REFLECTION_RAY_COUNT;
     }
@@ -569,7 +566,6 @@ vec3 evaluate_refraction(
             vec3 h = tbn * sample_ggx_vndf_tangent(tan_view, mat.roughness2, u);
             vec3 dir = refract(-view, h, ior_ratio);
             vec3 refr_color = refraction_path(pos, h, dir, mat, environment_indices, 0.05);
-            // Yeah, the clamping is arbitrary. It removes some fireflies.
             light += clamp(refr_color * (1.0f - ggx_vndf_attenuation(view, dir, mat)), vec3(0), vec3(5));
         }
         light /= REFRACTION_RAY_COUNT;

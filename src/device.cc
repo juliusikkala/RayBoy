@@ -38,7 +38,7 @@ device::device(
 ){
     const char* device_extensions[] = {
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_QUERY_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
@@ -127,7 +127,7 @@ device::device(
 
     if(!found_device)
         throw std::runtime_error("Failed to find a device suitable for rendering");
- 
+
     std::cout << "Using " << physical_device_props.properties.deviceName << std::endl;
     supports_ray_tracing = found_rt_device;
     std::cout << "Ray tracing " << (supports_ray_tracing ? "enabled" : "disabled") << std::endl;

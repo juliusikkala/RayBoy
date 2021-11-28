@@ -90,6 +90,9 @@ to install them separately.
 
 ## Building
 
+This repo uses submodules, so you need to clone recursively. It also uses Git
+LFS for the asset files, so make sure that it is [installed before cloning.](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
+
 ### Linux
 
 ```bash

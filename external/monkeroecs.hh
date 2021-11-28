@@ -595,7 +595,7 @@ bool ecs::foreach_iterator_base<Component>::finished()
 template<typename Component>
 void ecs::foreach_iterator_base<Component>::advance_up_to(entity id)
 {
-    auto last = std::min(end, begin + (id - begin->id));
+    auto last = begin + std::min(entity(end - begin), (id - begin->id));
     begin = std::lower_bound(begin + 1, last, id);
 }
 
@@ -681,7 +681,7 @@ void ecs::foreach_impl<pass_id, Components...>::call(ecs& ctx, F&& f)
                 (it.required ?
                     (it.begin->id == cur_id ?
                         true : (it.advance_up_to(cur_id), false)) : 
-                    (it.begin != it.end && it.begin->id >= cur_id ?
+                    (it.begin == it.end || it.begin->id >= cur_id ?
                         true : (it.advance_up_to(cur_id), true))) && ...
             );
             if(all_required_equal)
