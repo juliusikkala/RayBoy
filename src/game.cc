@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #define AUTOSAVE_INTERVAL (60*1000)
-#define BUTTON_ANIMATION_LENGTH_US (75000ll)
+#define BUTTON_ANIMATION_LENGTH_US time_ticks(75000)
 
 namespace
 {
@@ -683,19 +683,19 @@ void game::update_button_animations()
 
     if(emu->get_button(GB_KEY_A)) button_animations.a_time += dt;
     else button_animations.a_time -= dt;
-    button_animations.a_time = std::clamp(button_animations.a_time, 0ll, BUTTON_ANIMATION_LENGTH_US);
+    button_animations.a_time = std::clamp(button_animations.a_time, time_ticks(0), BUTTON_ANIMATION_LENGTH_US);
 
     if(emu->get_button(GB_KEY_B)) button_animations.b_time += dt;
     else button_animations.b_time -= dt;
-    button_animations.b_time = std::clamp(button_animations.b_time, 0ll, BUTTON_ANIMATION_LENGTH_US);
+    button_animations.b_time = std::clamp(button_animations.b_time, time_ticks(0), BUTTON_ANIMATION_LENGTH_US);
 
     if(emu->get_button(GB_KEY_START)) button_animations.start_time += dt;
     else button_animations.start_time -= dt;
-    button_animations.start_time = std::clamp(button_animations.start_time, 0ll, BUTTON_ANIMATION_LENGTH_US);
+    button_animations.start_time = std::clamp(button_animations.start_time, time_ticks(0), BUTTON_ANIMATION_LENGTH_US);
 
     if(emu->get_button(GB_KEY_SELECT)) button_animations.select_time += dt;
     else button_animations.select_time -= dt;
-    button_animations.select_time = std::clamp(button_animations.select_time, 0ll, BUTTON_ANIMATION_LENGTH_US);
+    button_animations.select_time = std::clamp(button_animations.select_time, time_ticks(0), BUTTON_ANIMATION_LENGTH_US);
 
     int new_dpad_state = 0;
     if(emu->get_button(GB_KEY_DOWN)) new_dpad_state |= 1;

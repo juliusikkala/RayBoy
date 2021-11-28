@@ -11,9 +11,11 @@ if(NOT FORCE_VENDOR_ALL)
     find_package(Vulkan)
 endif()
 
-#if (NOT SDL2_FOUND)
-#    add_subdirectory(external/SDL)
-#endif()
+# TODO: Clean this up so that Windows build wouldn't require manually fetching
+# the library...
+if (NOT SDL2_FOUND AND NOT WIN32)
+    add_subdirectory(external/SDL)
+endif()
 if (NOT Vulkan_FOUND)
     add_subdirectory(external/Vulkan-Headers)
     add_subdirectory(external/Vulkan-Loader)
@@ -69,6 +71,7 @@ endforeach()
 
 if (WIN32)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
+    set(EXTRA_WIN_SRC external/bsd-asprintf.c)
 elseif(UNIX AND NOT APPLE)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_XLIB_KHR)
 elseif(APPLE)
@@ -133,6 +136,7 @@ add_executable(rayboy
     external/imgui/imgui_widgets.cpp
     external/imgui/backends/imgui_impl_vulkan.cpp
     external/imgui/backends/imgui_impl_sdl.cpp
+    ${EXTRA_WIN_SRC}
     src/main.cc
     src/context.cc
     src/device.cc
@@ -177,7 +181,6 @@ add_executable(rayboy
     src/game.cc
     src/error.cc
     src/environment_map.cc
-    src/bsd-asprintf.c
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -195,16 +198,22 @@ target_include_directories(rayboy PUBLIC
 target_compile_features(rayboy PUBLIC cxx_std_17)
 if (Vulkan_FOUND)
     target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
-    #target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+    if (NOT WIN32)
+        target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+    endif()
 else()
     target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
-    #target_link_libraries(rayboy PUBLIC vulkan)
+    if (NOT WIN32)
+        target_link_libraries(rayboy PUBLIC vulkan)
+    endif()
 endif()
 if (SDL2_FOUND)
     target_link_libraries(rayboy PUBLIC SDL2::SDL2)
-else()
+elseif (WIN32)
     target_link_directories(rayboy PUBLIC "external/SDL/VisualC/x64/Release")
     target_link_libraries(rayboy PUBLIC SDL2 SDL2main)
+else()
+    target_link_libraries(rayboy PUBLIC SDL2)
 endif()
 target_link_libraries(rayboy PUBLIC soloud)
 target_link_libraries(rayboy PUBLIC Threads::Threads)
