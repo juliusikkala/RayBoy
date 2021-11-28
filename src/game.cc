@@ -125,7 +125,7 @@ void game::load_common_assets()
 {
     console_data = load_gltf(
         *gfx_ctx,
-        get_readonly_path("data/gbcv2_contraband_asset.glb"),
+        get_readonly_path("data/rayboy.glb"),
         ecs_scene
     );
     gbc = ecs_scene.get<transformable>(console_data.entities["GBC"]);
