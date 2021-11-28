@@ -1,5 +1,7 @@
 #include "io.hh"
 #include "options.hh"
+#include "stb_image.h"
+#include "error.hh"
 #include <SDL.h>
 #include <cstdio>
 #include <algorithm>
@@ -132,4 +134,17 @@ void load_options(options& opts)
     {
         opts = options();
     }
+}
+
+SDL_Surface* load_image(const char* path)
+{
+    int w, h, dummy;
+    uint8_t* data = stbi_load(path, &w, &h, &dummy, STBI_rgb_alpha);
+    if(!data) panic("Failed to read icon from %s\n", path);
+
+    return SDL_CreateRGBSurfaceWithFormatFrom(
+        (void*)data, w, h,
+        32, sizeof(uint32_t) * w,
+        SDL_PIXELFORMAT_RGBA32
+    );
 }

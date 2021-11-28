@@ -455,6 +455,59 @@ void image_barrier(
     vkCmdPipelineBarrier2KHR(cmd, &dependency_info);
 }
 
+void buffer_barrier(
+    VkCommandBuffer cmd,
+    VkBuffer buf,
+    VkAccessFlags2KHR happens_before,
+    VkAccessFlags2KHR happens_after,
+    VkPipelineStageFlags2KHR stage_before,
+    VkPipelineStageFlags2KHR stage_after
+){
+    VkBufferMemoryBarrier2KHR buffer_barrier = {
+        VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2_KHR,
+        nullptr,
+        stage_before,
+        happens_before,
+        stage_after,
+        happens_after,
+        VK_QUEUE_FAMILY_IGNORED,
+        VK_QUEUE_FAMILY_IGNORED,
+        buf,
+        0,
+        VK_WHOLE_SIZE
+    };
+    VkDependencyInfoKHR dependency_info = {
+        VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+        nullptr,
+        0,
+        0, nullptr,
+        1, &buffer_barrier,
+        0, nullptr
+    };
+    vkCmdPipelineBarrier2KHR(cmd, &dependency_info);
+}
+
+void full_barrier(VkCommandBuffer cmd)
+{
+    VkMemoryBarrier2KHR barrier = {
+        VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,
+        nullptr,
+        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
+        VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR,
+        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
+        VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR
+    };
+    VkDependencyInfoKHR dependency_info = {
+        VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+        nullptr,
+        0,
+        1, &barrier,
+        0, nullptr,
+        0, nullptr
+    };
+    vkCmdPipelineBarrier2KHR(cmd, &dependency_info);
+}
+
 void interlace(void* dst, const void* src, const void* fill, size_t src_stride, size_t dst_stride, size_t entries)
 {
     for(size_t i = 0; i < entries; ++i)

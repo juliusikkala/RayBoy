@@ -71,7 +71,7 @@ endforeach()
 
 if (WIN32)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
-    set(EXTRA_WIN_SRC external/bsd-asprintf.c)
+    set(EXTRA_WIN_SRC WIN32 external/bsd-asprintf.c data/appicon.rc)
 elseif(UNIX AND NOT APPLE)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_XLIB_KHR)
 elseif(APPLE)
@@ -103,7 +103,7 @@ add_library(SameBoy STATIC ${SAMEBOY_CORE_SRC})
 target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_DISABLE_TIMEKEEPING GB_DISABLE_REWIND GB_DISABLE_CHEATS GB_DISABLE_DEBUGGER GB_VERSION="0.14.7")
 if (MSVC)
     target_compile_options(SameBoy PRIVATE
-        /w
+        /w /Dssize_t=int64_t
     )
 else()
     target_compile_options(SameBoy PRIVATE
@@ -127,6 +127,7 @@ target_include_directories(
 )
 
 add_executable(rayboy
+    ${EXTRA_WIN_SRC}
     external/vk_mem_alloc.cc
     external/stb_image.cc
     external/tiny_gltf.cc
@@ -136,7 +137,6 @@ add_executable(rayboy
     external/imgui/imgui_widgets.cpp
     external/imgui/backends/imgui_impl_vulkan.cpp
     external/imgui/backends/imgui_impl_sdl.cpp
-    ${EXTRA_WIN_SRC}
     src/main.cc
     src/context.cc
     src/device.cc
@@ -228,6 +228,8 @@ if (WIN32)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/vs2010
     )
     target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
+    
+    #set_property(TARGET rayboy PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 elseif(UNIX AND NOT APPLE)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/libnfd.a)
     add_custom_target(nativefiledialog

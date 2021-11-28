@@ -64,5 +64,7 @@ void gpu_buffer::upload(VkCommandBuffer cmd, uint32_t image_index)
         VkBuffer source = staging_buffers[image_index];
         VkBufferCopy copy = {0, 0, bytes};
         vkCmdCopyBuffer(cmd, source, target, 1, &copy);
+
+        buffer_barrier(cmd, target);
     }
 }

@@ -109,6 +109,12 @@ game::game(const char* initial_rom)
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     save_timer = SDL_AddTimer(AUTOSAVE_INTERVAL, autosave, this);
 
+#if !defined(_WIN32) && !defined(WIN32) 
+    SDL_Surface* icon = load_image(get_readonly_path("data/128.png").c_str());
+    SDL_SetWindowIcon(gfx_ctx->get_window(), icon);
+    SDL_FreeSurface(icon);
+#endif
+
     load_common_assets();
     load_scene(opt.scene);
 }

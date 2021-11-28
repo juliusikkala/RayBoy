@@ -16,6 +16,7 @@ protected:
     void update_buffers(uint32_t image_index) override;
 
 private:
+    render_target target;
     vkres<VkDescriptorPool> descriptor_pool;
     vkres<VkRenderPass> render_pass;
     std::vector<vkres<VkFramebuffer>> framebuffers;
