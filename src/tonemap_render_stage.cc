@@ -55,7 +55,7 @@ tonemap_render_stage::tonemap_render_stage(
         sizeof(push_constants)
     );
 
-    push_constants pc = {opt.algorithm, src.get_samples()};
+    push_constants pc = {opt.algorithm, (uint32_t)src.get_samples()};
 
     // Assign parameters to the shader
     for(size_t i = 0; i < ctx.get_image_count(); ++i)

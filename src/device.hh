@@ -26,7 +26,6 @@ struct device
     VkPhysicalDeviceFeatures2 physical_device_features;
     VkPhysicalDeviceVulkan12Features vulkan12_features;
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
-    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_address_features;
     VkPhysicalDeviceRayQueryFeaturesKHR rq_features;
     VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features;
     VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties;

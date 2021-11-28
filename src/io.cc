@@ -88,7 +88,7 @@ std::vector<fs::path> get_readonly_paths()
     std::vector<fs::path> paths;
     paths.push_back(path);
 
-    paths.push_back(".");
+    paths.push_back(fs::current_path());
 #ifdef DATA_DIRECTORY
     paths.push_back(fs::path{DATA_DIRECTORY});
 #endif

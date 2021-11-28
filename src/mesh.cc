@@ -101,7 +101,7 @@ void mesh::rebuild_acceleration_structure()
             vkGetBufferDeviceAddress(ctx->get_device().logical_device, &index_info),
             0
         },
-        opaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR
+        (VkGeometryFlagsKHR)(opaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR)
     };
 
     VkAccelerationStructureBuildGeometryInfoKHR as_build_info = {
@@ -146,7 +146,8 @@ void mesh::rebuild_acceleration_structure()
     as_build_info.scratchData.deviceAddress = vkGetBufferDeviceAddress(
         ctx->get_device().logical_device,
         &scratch_info
-    ) + alignment - (build_size.buildScratchSize % alignment);
+    );
+    as_build_info.scratchData.deviceAddress += alignment - (as_build_info.scratchData.deviceAddress % alignment);
 
     vkres<VkBuffer> uncompact_blas_buffer = create_gpu_buffer(
         *ctx,

@@ -11,9 +11,9 @@ if(NOT FORCE_VENDOR_ALL)
     find_package(Vulkan)
 endif()
 
-if (NOT SDL2_FOUND)
-    add_subdirectory(external/SDL)
-endif()
+#if (NOT SDL2_FOUND)
+#    add_subdirectory(external/SDL)
+#endif()
 if (NOT Vulkan_FOUND)
     add_subdirectory(external/Vulkan-Headers)
     add_subdirectory(external/Vulkan-Loader)
@@ -98,11 +98,17 @@ set(SAMEBOY_CORE_SRC
 )
 add_library(SameBoy STATIC ${SAMEBOY_CORE_SRC})
 target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_DISABLE_TIMEKEEPING GB_DISABLE_REWIND GB_DISABLE_CHEATS GB_DISABLE_DEBUGGER GB_VERSION="0.14.7")
-target_compile_options(SameBoy PRIVATE
-    -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
-    -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
-    -Wno-implicit-function-declaration -O3
-) 
+if (MSVC)
+    target_compile_options(SameBoy PRIVATE
+        /w
+    )
+else()
+    target_compile_options(SameBoy PRIVATE
+        -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
+        -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
+        -Wno-implicit-function-declaration -O3
+    )
+endif()
 
 file(
     GLOB SOLOUD_SRC
@@ -171,6 +177,7 @@ add_executable(rayboy
     src/game.cc
     src/error.cc
     src/environment_map.cc
+    src/bsd-asprintf.c
     ${shader_binary}
 )
 target_include_directories(rayboy PUBLIC
@@ -187,15 +194,17 @@ target_include_directories(rayboy PUBLIC
 )
 target_compile_features(rayboy PUBLIC cxx_std_17)
 if (Vulkan_FOUND)
-    target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+    target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
+    #target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
 else()
     target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
-    target_link_libraries(rayboy PUBLIC vulkan)
+    #target_link_libraries(rayboy PUBLIC vulkan)
 endif()
 if (SDL2_FOUND)
     target_link_libraries(rayboy PUBLIC SDL2::SDL2)
 else()
-    target_link_libraries(rayboy PUBLIC SDL2)
+    target_link_directories(rayboy PUBLIC "external/SDL/VisualC/x64/Release")
+    target_link_libraries(rayboy PUBLIC SDL2 SDL2main)
 endif()
 target_link_libraries(rayboy PUBLIC soloud)
 target_link_libraries(rayboy PUBLIC Threads::Threads)
@@ -206,8 +215,8 @@ target_link_libraries(rayboy PUBLIC ktx)
 if (WIN32)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/nfd.lib)
     add_custom_target(nativefiledialog
-        COMMAND make nfd
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/gmake_windows
+        COMMAND msbuild nfd.vcxproj
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/vs2010
     )
     target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
 elseif(UNIX AND NOT APPLE)
@@ -228,6 +237,8 @@ elseif(APPLE)
     target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
 endif()
 
+set_property(TARGET rayboy PROPERTY C_STANDARD 11)
+set_property(TARGET rayboy PROPERTY CXX_STANDARD 17)
 target_link_libraries(rayboy PUBLIC ${GTK_LIBRARIES})
 add_dependencies(rayboy nativefiledialog)
 
