@@ -221,5 +221,6 @@ device::~device()
 
 void device::finish() const
 {
-    assert(vkDeviceWaitIdle(logical_device) == VK_SUCCESS);
+    VkResult res = vkDeviceWaitIdle(logical_device);
+    assert(res == VK_SUCCESS);
 }
