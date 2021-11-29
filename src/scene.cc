@@ -17,51 +17,51 @@ namespace
 struct gpu_material
 {
     // xyz = color, w = alpha
-    vec4 color_factor;
+    pvec4 color_factor;
     // x = metallic, y = roughness, z = normal, w = ior
-    vec4 metallic_roughness_normal_ior_factors;
+    pvec4 metallic_roughness_normal_ior_factors;
     // xyz = emission intensity, w = transmittance
-    vec4 emission_transmittance_factors;
+    pvec4 emission_transmittance_factors;
     // x = color + alpha, y = metallic+roughness, z = normal, w = emission
-    ivec4 textures;
+    pivec4 textures;
 };
 
 struct gpu_instance
 {
-    mat4 model_to_world;
-    mat4 normal_to_world;
-    mat4 prev_mvp;
+    pmat4 model_to_world;
+    pmat4 normal_to_world;
+    pmat4 prev_mvp;
     gpu_material material;
     // x = radiance index, y = irradiance index, z = lightmap index, w = mesh index
-    ivec4 environment_mesh;
+    pivec4 environment_mesh;
 };
 
 struct gpu_camera
 {
-    mat4 view_proj;
-    mat4 view;
-    vec4 projection_info;
-    vec4 clip_info;
-    vec4 origin;
-    vec4 noise;
+    pmat4 view_proj;
+    pmat4 view;
+    pvec4 projection_info;
+    pvec4 clip_info;
+    pvec4 origin;
+    pvec4 noise;
 };
 
 struct gpu_point_light
 {
     // xyz = color, w = radius (soft shadows)
-    vec4 color_radius;
+    pvec4 color_radius;
     // xyz = position in world space, w = falloff exponent
-    vec4 pos_falloff;
+    pvec4 pos_falloff;
     // xyz = direction in world space, w = cutoff angle in radians
-    vec4 direction_cutoff;
+    pvec4 direction_cutoff;
 };
 
 struct gpu_directional_light
 {
     // xyz = color, w = unused.
-    vec4 color;
+    pvec4 color;
     // xyz = In world space, w = cos(solid_angle).
-    vec4 direction;
+    pvec4 direction;
 };
 
 }
