@@ -31,3 +31,6 @@
 [submodule "external/KTX-Software"]
 	path = external/KTX-Software
 	url = https://github.com/KhronosGroup/KTX-Software.git
+[submodule "rayboy-data"]
+	path = data
+	url = https://gitlab.com/juliusikkala/rayboy-data.git
