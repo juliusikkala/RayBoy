@@ -90,13 +90,13 @@ to install them separately.
 
 ## Building
 
-This repo uses submodules, so you need to clone recursively. It also uses Git
-LFS for the asset files, so make sure that it is [installed before cloning.](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
+This repo uses submodules, so you need to clone recursively. A submodule also
+uses Git LFS for the asset files, so make sure that it is [installed before cloning.](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
 
 ### Linux
 
 ```bash
-git clone --recursive https://github.com/juliusikkala/RayBoy
+git clone --recursive https://gitlab.com/juliusikkala/rayboy
 cd RayBoy
 cmake -S . -B release -DCMAKE_BUILD_TYPE=Release
 cmake --build release
