@@ -18,8 +18,9 @@ frontend.
 
 ## Download
 
-TODO - add a GitHub release once we have a windows build and the assets in the
-repo
+[Download .zip for Windows](https://github.com/juliusikkala/RayBoy/releases/download/v1.0.0/RayBoy.zip)
+
+[Download .tar.xz sources for Linux](https://github.com/juliusikkala/RayBoy/releases/download/v1.0.0/RayBoy.tar.xz)
 
 ## Features
 
