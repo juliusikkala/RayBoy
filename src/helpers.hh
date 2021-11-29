@@ -76,11 +76,22 @@ void image_barrier(
     VkImageLayout layout_after,
     uint32_t mip_level = 0,
     uint32_t mip_count = VK_REMAINING_MIP_LEVELS,
+    VkAccessFlags2KHR happens_before = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT_KHR | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT_KHR,
+    VkAccessFlags2KHR happens_after = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT_KHR,
+    VkPipelineStageFlags2KHR stage_before = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
+    VkPipelineStageFlags2KHR stage_after = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
+);
+
+void buffer_barrier(
+    VkCommandBuffer cmd,
+    VkBuffer buf,
     VkAccessFlags2KHR happens_before = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT_KHR,
     VkAccessFlags2KHR happens_after = VK_ACCESS_2_MEMORY_WRITE_BIT_KHR | VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT_KHR,
     VkPipelineStageFlags2KHR stage_before = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
     VkPipelineStageFlags2KHR stage_after = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
 );
+
+void full_barrier(VkCommandBuffer cmd);
 
 void interlace(void* dst, const void* src, const void* fill, size_t src_stride, size_t dst_stride, size_t entries);
 

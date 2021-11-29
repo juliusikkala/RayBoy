@@ -9,6 +9,8 @@
 #include "error.hh"
 #include <initializer_list>
 
+#define INSTANCES_BUFFER_ALIGNMENT 16
+
 namespace
 {
 
@@ -227,16 +229,17 @@ bool scene::update(uint32_t image_index)
 
     if(ray_tracing)
     {
-        rt_instances.update<VkAccelerationStructureInstanceKHR>(image_index, [&](VkAccelerationStructureInstanceKHR* data) {
+        rt_instances.update<uint8_t>(image_index, [&](uint8_t* deviceptr) {
             rt_instance_count = 0;
             size_t i = 0;
+            VkAccelerationStructureInstanceKHR *base = (VkAccelerationStructureInstanceKHR*)(deviceptr + INSTANCES_BUFFER_ALIGNMENT - ((uintptr_t)deviceptr % INSTANCES_BUFFER_ALIGNMENT));
             e->foreach([&](entity id, transformable& t, model& m, visible&, ray_traced* rt) {
                 mat4 transform = transpose(t.get_global_transform());
                 for(const model::vertex_group& group: m)
                 {
                     if(rt)
                     {
-                        data[rt_instance_count] = {
+                        base[rt_instance_count] = {
                             {}, (uint32_t)i,
                             group.mat.potentially_transparent() && !rt->refraction ? 2u : 1u,
                             0,
@@ -244,8 +247,8 @@ bool scene::update(uint32_t image_index)
                             group.mesh->get_blas_address()
                         };
                         memcpy(
-                            &data[rt_instance_count].transform, &transform,
-                            sizeof(data[rt_instance_count].transform)
+                            &base[rt_instance_count].transform, &transform,
+                            sizeof(base[rt_instance_count].transform)
                         );
                         rt_instance_count++;
                     }
@@ -444,7 +447,10 @@ int32_t scene::get_entity_instance_id(entity id, uint32_t vg_index) const
 
 void scene::init_rt()
 {
-    rt_instances.resize(max_entries * sizeof(VkAccelerationStructureInstanceKHR));
+    rt_instances.resize(max_entries * sizeof(VkAccelerationStructureInstanceKHR) + INSTANCES_BUFFER_ALIGNMENT);
+
+    VkDeviceAddress bufaddr = rt_instances.get_device_address(0);
+    bufaddr += INSTANCES_BUFFER_ALIGNMENT - (bufaddr % INSTANCES_BUFFER_ALIGNMENT);
 
     VkAccelerationStructureGeometryKHR as_geom = {
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
@@ -457,7 +463,7 @@ void scene::init_rt()
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
         nullptr,
         VK_FALSE,
-        VkDeviceOrHostAddressConstKHR{rt_instances.get_device_address(0)}
+        VkDeviceOrHostAddressConstKHR{bufaddr}
     };
 
     VkAccelerationStructureBuildGeometryInfoKHR as_build_info = {
@@ -511,7 +517,7 @@ void scene::init_rt()
     tlas = vkres(*ctx, as_tmp);
 
     uint32_t alignment = ctx->get_device().as_properties.minAccelerationStructureScratchOffsetAlignment;
-    vkres<VkBuffer> scratch_buffer = create_gpu_buffer(
+    tlas_scratch = create_gpu_buffer(
         *ctx,
         build_size.buildScratchSize + alignment,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
@@ -519,7 +525,7 @@ void scene::init_rt()
     VkBufferDeviceAddressInfo scratch_info = {
         VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
         nullptr,
-        scratch_buffer
+        tlas_scratch
     };
     scratch_address = vkGetBufferDeviceAddress(
         ctx->get_device().logical_device,
@@ -564,12 +570,17 @@ void scene::upload_rt(VkCommandBuffer cmd, uint32_t image_index, bool full_refre
         VK_GEOMETRY_OPAQUE_BIT_KHR|
         VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR
     };
+
+    VkDeviceAddress bufaddr = rt_instances.get_device_address(0);
+    bufaddr += INSTANCES_BUFFER_ALIGNMENT - (bufaddr % INSTANCES_BUFFER_ALIGNMENT);
+
     as_geom.geometry.instances = {
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
         nullptr,
         VK_FALSE,
-        VkDeviceOrHostAddressConstKHR{rt_instances.get_device_address(0)}
+        {}
     };
+    as_geom.geometry.instances.data.deviceAddress = bufaddr;
 
     VkAccelerationStructureBuildGeometryInfoKHR as_build_info = {
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,

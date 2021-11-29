@@ -72,12 +72,11 @@ forward_render_stage::forward_render_stage(
         {
             init_depth_pre_pass(
                 rt.opaque_depth_pre_pass, s, &opaque_depth,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
             );
             init_depth_pre_pass(
                 rt.transparent_depth_pre_pass, s, &transparent_depth,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
-                false
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
             );
             init_generate_pass(
                 rt.opaque_generate_pass, s,
@@ -112,44 +111,11 @@ forward_render_stage::forward_render_stage(
             rt.opaque_depth_pre_pass.begin_render_pass(buf, i);
             draw_entities(i, buf, s, rt.opaque_depth_pre_pass, 1, 0);
             rt.opaque_depth_pre_pass.end_render_pass(buf);
-
-            // Copy opaque depth to other depth
-            image_barrier(
-                buf,
-                rt.transparent_depth->get_image(i),
-                rt.transparent_depth->get_format(),
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-            );
-
-            VkImageCopy copy{
-                {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1},
-                {0, 0, 0},
-                {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1},
-                {0, 0, 0},
-                {size.x, size.y, 1}
-            };
-
-            vkCmdCopyImage(
-                buf,
-                rt.opaque_depth->get_image(i),
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                rt.transparent_depth->get_image(i),
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1, &copy
-            );
-
-            image_barrier(
-                buf,
-                rt.opaque_depth->get_image(i),
-                rt.opaque_depth->get_format(),
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR
-            );
-
+            
             // Transparent depth pre-pass
             rt.transparent_depth_pre_pass.bind(buf, i);
             rt.transparent_depth_pre_pass.begin_render_pass(buf, i);
+            draw_entities(i, buf, s, rt.transparent_depth_pre_pass, 1, 0);
             draw_entities(i, buf, s, rt.transparent_depth_pre_pass, 1, 1);
             rt.transparent_depth_pre_pass.end_render_pass(buf);
 
@@ -164,6 +130,49 @@ forward_render_stage::forward_render_stage(
             rt.transparent_generate_pass.begin_render_pass(buf, i);
             draw_entities(i, buf, s, rt.transparent_generate_pass, 1, 1);
             rt.transparent_generate_pass.end_render_pass(buf);
+
+            image_barrier(
+                buf,
+                rt.opaque_depth->get_image(i),
+                rt.opaque_depth->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            image_barrier(
+                buf,
+                rt.transparent_depth->get_image(i),
+                rt.transparent_depth->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            image_barrier(
+                buf,
+                rt.opaque_accumulation->get_image(i),
+                rt.opaque_accumulation->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            image_barrier(
+                buf,
+                rt.transparent_accumulation->get_image(i),
+                rt.transparent_accumulation->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            image_barrier(
+                buf,
+                rt.opaque_normal->get_image(i),
+                rt.opaque_normal->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            image_barrier(
+                buf,
+                rt.transparent_normal->get_image(i),
+                rt.transparent_normal->get_format(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
         }
 
         // Pre-pass to prevent overdraw (it's ridiculously expensive with RT)
@@ -430,6 +439,7 @@ void forward_render_stage::init_generate_pass(
     gfx_params.attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     gfx_params.attachments[2].initialLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
     gfx_params.attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    //gfx_params.attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     gfx_params.attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     gp.init(

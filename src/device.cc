@@ -1,6 +1,7 @@
 #include "device.hh"
 #include <string>
 #include <iostream>
+#include <cassert>
 
 namespace
 {
@@ -38,7 +39,7 @@ device::device(
 ){
     const char* device_extensions[] = {
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_QUERY_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
@@ -128,6 +129,12 @@ device::device(
     if(!found_device)
         throw std::runtime_error("Failed to find a device suitable for rendering");
 
+    if(physical_device_props.properties.vendorID == 4098)
+    {
+        // AMD is being too nitpicky about something with the acceleration structure building :/
+        found_rt_device = false;
+    }
+
     std::cout << "Using " << physical_device_props.properties.deviceName << std::endl;
     supports_ray_tracing = found_rt_device;
     std::cout << "Ray tracing " << (supports_ray_tracing ? "enabled" : "disabled") << std::endl;
@@ -146,8 +153,9 @@ device::device(
     physical_device_features.features.samplerAnisotropy = VK_TRUE;
     vulkan12_features.timelineSemaphore = VK_TRUE;
     vulkan12_features.scalarBlockLayout = VK_TRUE;
-    vulkan12_features.bufferDeviceAddress = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
+    if (supports_ray_tracing)
+        vulkan12_features.bufferDeviceAddress = VK_TRUE;
     rq_features.rayQuery = VK_TRUE;
     as_features.accelerationStructure = VK_TRUE;
 
@@ -169,7 +177,7 @@ device::device(
         found_rt_device ? rt_extension_count : required_extension_count, device_extensions,
         nullptr
     };
-    vkCreateDevice(physical_device, &device_create_info, nullptr, &logical_device);
+    VkResult res = vkCreateDevice(physical_device, &device_create_info, nullptr, &logical_device);
 
     // Get queues
     vkGetDeviceQueue(logical_device, graphics_family_index, 0, &graphics_queue);
@@ -213,5 +221,5 @@ device::~device()
 
 void device::finish() const
 {
-    vkDeviceWaitIdle(logical_device);
+    assert(vkDeviceWaitIdle(logical_device) == VK_SUCCESS);
 }

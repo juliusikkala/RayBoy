@@ -101,7 +101,7 @@ VkCommandBuffer render_stage::commands(VkCommandPool pool, bool one_time_submit)
     VkCommandBufferBeginInfo begin_info = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         nullptr,
-        one_time_submit ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        (VkCommandBufferUsageFlags)(one_time_submit ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT),
         nullptr
     };
     vkBeginCommandBuffer(buf, &begin_info);

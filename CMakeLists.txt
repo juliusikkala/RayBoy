@@ -11,7 +11,9 @@ if(NOT FORCE_VENDOR_ALL)
     find_package(Vulkan)
 endif()
 
-if (NOT SDL2_FOUND)
+# TODO: Clean this up so that Windows build wouldn't require manually fetching
+# the library...
+if (NOT SDL2_FOUND AND NOT WIN32)
     add_subdirectory(external/SDL)
 endif()
 if (NOT Vulkan_FOUND)
@@ -69,6 +71,7 @@ endforeach()
 
 if (WIN32)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
+    set(EXTRA_WIN_SRC WIN32 external/bsd-asprintf.c data/appicon.rc)
 elseif(UNIX AND NOT APPLE)
     set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_XLIB_KHR)
 elseif(APPLE)
@@ -98,11 +101,17 @@ set(SAMEBOY_CORE_SRC
 )
 add_library(SameBoy STATIC ${SAMEBOY_CORE_SRC})
 target_compile_definitions(SameBoy PUBLIC GB_INTERNAL GB_DISABLE_TIMEKEEPING GB_DISABLE_REWIND GB_DISABLE_CHEATS GB_DISABLE_DEBUGGER GB_VERSION="0.14.7")
-target_compile_options(SameBoy PRIVATE
-    -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
-    -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
-    -Wno-implicit-function-declaration -O3
-) 
+if (MSVC)
+    target_compile_options(SameBoy PRIVATE
+        /w /Dssize_t=int64_t
+    )
+else()
+    target_compile_options(SameBoy PRIVATE
+        -Wno-missing-braces -Wno-nonnull -Wno-unused-result -Wno-strict-aliasing
+        -Wno-multichar -Wno-int-in-bool-context -Wno-format-truncation
+        -Wno-implicit-function-declaration -O3
+    )
+endif()
 
 file(
     GLOB SOLOUD_SRC
@@ -118,6 +127,7 @@ target_include_directories(
 )
 
 add_executable(rayboy
+    ${EXTRA_WIN_SRC}
     external/vk_mem_alloc.cc
     external/stb_image.cc
     external/tiny_gltf.cc
@@ -187,13 +197,21 @@ target_include_directories(rayboy PUBLIC
 )
 target_compile_features(rayboy PUBLIC cxx_std_17)
 if (Vulkan_FOUND)
-    target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+    target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
+    if (NOT WIN32)
+        target_link_libraries(rayboy PUBLIC Vulkan::Vulkan)
+    endif()
 else()
     target_include_directories(rayboy PUBLIC "external/Vulkan-Headers/include")
-    target_link_libraries(rayboy PUBLIC vulkan)
+    if (NOT WIN32)
+        target_link_libraries(rayboy PUBLIC vulkan)
+    endif()
 endif()
 if (SDL2_FOUND)
     target_link_libraries(rayboy PUBLIC SDL2::SDL2)
+elseif (WIN32)
+    target_link_directories(rayboy PUBLIC "external/SDL/VisualC/x64/Release")
+    target_link_libraries(rayboy PUBLIC SDL2 SDL2main)
 else()
     target_link_libraries(rayboy PUBLIC SDL2)
 endif()
@@ -206,10 +224,12 @@ target_link_libraries(rayboy PUBLIC ktx)
 if (WIN32)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/nfd.lib)
     add_custom_target(nativefiledialog
-        COMMAND make nfd
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/gmake_windows
+        COMMAND msbuild nfd.vcxproj
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/vs2010
     )
     target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
+    
+    #set_property(TARGET rayboy PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 elseif(UNIX AND NOT APPLE)
     set(NFD_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/nativefiledialog/build/lib/Release/x64/libnfd.a)
     add_custom_target(nativefiledialog
@@ -228,6 +248,8 @@ elseif(APPLE)
     target_link_libraries(rayboy PUBLIC ${NFD_LIB_PATH})
 endif()
 
+set_property(TARGET rayboy PROPERTY C_STANDARD 11)
+set_property(TARGET rayboy PROPERTY CXX_STANDARD 17)
 target_link_libraries(rayboy PUBLIC ${GTK_LIBRARIES})
 add_dependencies(rayboy nativefiledialog)
 

@@ -366,6 +366,7 @@ void context::init_vulkan()
     std::vector<VkLayerProperties> available_layers(available_layer_count);
     vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers.data());
 
+#ifndef NDEBUG
     for(auto& layer: available_layers)
     {
         if(strcmp(layer.layerName, "VK_LAYER_KHRONOS_validation") == 0)
@@ -373,6 +374,7 @@ void context::init_vulkan()
             validation_layers.push_back("VK_LAYER_KHRONOS_validation");
         }
     }
+#endif
 
     VkInstanceCreateInfo instance_info {
         VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -389,6 +391,7 @@ void context::init_vulkan()
 
     volkLoadInstance(vulkan);
 
+#ifndef NDEBUG
     VkDebugUtilsMessengerCreateInfoEXT messenger_info = {
         VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         nullptr,
@@ -397,7 +400,7 @@ void context::init_vulkan()
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT|
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT|
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        //VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT|
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT|
         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT|
         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         [](
@@ -412,11 +415,14 @@ void context::init_vulkan()
         nullptr
     };
     vkCreateDebugUtilsMessengerEXT(vulkan, &messenger_info, nullptr, &messenger);
+#endif
 }
 
 void context::deinit_vulkan()
 {
+#ifndef NDEBUG
     vkDestroyDebugUtilsMessengerEXT(vulkan, messenger, nullptr);
+#endif
     vkDestroyInstance(vulkan, nullptr);
 }
 

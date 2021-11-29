@@ -3,7 +3,7 @@
 #include "helpers.hh"
 
 gui_render_stage::gui_render_stage(context& ctx, render_target& target)
-: render_stage(ctx), stage_timer(ctx, "gui_render_stage")
+: render_stage(ctx), target(target), stage_timer(ctx, "gui_render_stage")
 {
     const device& dev = ctx.get_device();
     uvec2 size = ctx.get_size();
@@ -137,6 +137,13 @@ void gui_render_stage::update_buffers(uint32_t image_index)
     clear_commands();
     VkCommandBuffer buf = graphics_commands(true);
     stage_timer.start(buf, image_index);
+    image_barrier(
+        buf,
+        target[image_index].image,
+        target.get_format(),
+        target.get_layout(),
+        target.get_layout()
+    );
 
     VkRenderPassBeginInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

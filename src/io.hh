@@ -3,6 +3,7 @@
 #include "json.hpp"
 #include <filesystem>
 #include <set>
+#include <SDL.h>
 using json = nlohmann::json;
 
 namespace fs = std::filesystem;
@@ -18,5 +19,7 @@ struct options;
 
 void write_options(const options& opts);
 void load_options(options& opts);
+
+SDL_Surface* load_image(const char* path);
 
 #endif

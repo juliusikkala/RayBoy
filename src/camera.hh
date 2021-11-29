@@ -39,12 +39,15 @@ public:
 private:
     void update_projection();
 
-    mat4 projection = mat4(0);
-    float fov = 0.0f, near = 0.0f, far = 1.0f, aspect = 1.0f;
+    mat4 projection;
+    float fov;
+    float near;
+    float far;
+    float aspect;
     struct frustum f;
 
-    vec3 clip_info = vec3(0);
-    vec2 projection_info = vec2(0);
+    vec3 clip_info;
+    vec2 projection_info;
 };
 
 #endif
