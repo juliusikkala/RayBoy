@@ -1,6 +1,8 @@
 Rayboy
 ======
 
+![image of Rayboy running](screenshots/screenshot11.png)
+
 Ever wanted to choke your RTX 3090 while playing 8-bit videogames?
 How about feeling the nostalgia of reflective LCDs with fat pixels?
 Or do you just want free eye candy to justify your GPU?
@@ -11,6 +13,8 @@ Rayboy is a GBC emulator with ray tracing and copious detail. It uses the
 [SameBoy](https://github.com/LIJI32/SameBoy) project as the emulator backend to
 provide accurate GBC emulation. Therefore, Rayboy itself is mostly just a
 frontend.
+
+[Youtube demonstration video](https://www.youtube.com/watch?v=YoAKs69ZtnU)
 
 ## Download
 
