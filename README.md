@@ -18,9 +18,7 @@ frontend.
 
 ## Download
 
-[Download .zip for Windows](https://github.com/juliusikkala/RayBoy/releases/download/v1.0.0/RayBoy.zip)
-
-[Download .tar.xz sources for Linux](https://github.com/juliusikkala/RayBoy/releases/download/v1.0.0/RayBoy.tar.xz)
+[See the GitHub Releases page for the latest version!](https://github.com/juliusikkala/RayBoy/releases)
 
 ## Features
 
