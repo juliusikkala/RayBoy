@@ -101,7 +101,7 @@ uses Git LFS for the asset files, so make sure that it is [installed before clon
 ```bash
 git clone --recursive https://gitlab.com/juliusikkala/rayboy
 cd RayBoy
-cmake -S . -B release -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B release -DCMAKE_BUILD_TYPE=Release -DFORCE_VENDOR_ALL=ON
 cmake --build release
 release/rayboy
 ```
