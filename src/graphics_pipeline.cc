@@ -122,6 +122,15 @@ void graphics_pipeline::init(
     const std::vector<VkDescriptorSetLayoutBinding>& bindings,
     size_t push_constant_size
 ){
+    create_params = p;
+
+    // AMD Fix: MSAA is broken by default, so force sample shading with the matching minSampleShading
+    if (ctx->get_device().physical_device_props.properties.vendorID == 4098)
+    {
+        create_params.multisample_info.sampleShadingEnable = VK_TRUE;
+        create_params.multisample_info.minSampleShading = clamp(1.0f / create_params.multisample_info.rasterizationSamples + 0.01f, 0.0f, 1.0f);
+    }
+
     init_bindings(descriptor_set_count, bindings, push_constant_size);
 
     // Load shaders
@@ -149,7 +158,7 @@ void graphics_pipeline::init(
     // Setup fixed function structs
     VkPipelineViewportStateCreateInfo viewport_info = {
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        nullptr, 0, 1, &p.viewport, 1, &p.scissor
+        nullptr, 0, 1, &create_params.viewport, 1, &create_params.scissor
     };
 
     VkPipelineColorBlendStateCreateInfo blend_info = {
@@ -158,8 +167,8 @@ void graphics_pipeline::init(
         0,
         VK_FALSE,
         VK_LOGIC_OP_COPY,
-        uint32_t(p.blend_states.size()),
-        p.blend_states.data(),
+        uint32_t(create_params.blend_states.size()),
+        create_params.blend_states.data(),
         {0.0f, 0.0f, 0.0f, 0.0f}
     };
 
@@ -170,10 +179,10 @@ void graphics_pipeline::init(
 
     std::vector<VkAttachmentReference> color;
     std::vector<VkAttachmentReference> depth_stencil;
-    for(size_t i = 0; i < p.targets.size(); ++i)
+    for(size_t i = 0; i < create_params.targets.size(); ++i)
     {
         VkAttachmentReference ref = {(uint32_t)i, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR};
-        if(p.targets[i]->is_depth_stencil()) depth_stencil.push_back(ref);
+        if(create_params.targets[i]->is_depth_stencil()) depth_stencil.push_back(ref);
         else color.push_back(ref);
     }
 
@@ -208,8 +217,8 @@ void graphics_pipeline::init(
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         nullptr,
         0,
-        (uint32_t)p.attachments.size(),
-        p.attachments.data(),
+        (uint32_t)create_params.attachments.size(),
+        create_params.attachments.data(),
         1,
         &subpass,
         1,
@@ -229,13 +238,13 @@ void graphics_pipeline::init(
         0,
         (uint32_t)stages.size(),
         stages.data(),
-        &p.vertex_input_info,
-        &p.input_assembly_info,
+        &create_params.vertex_input_info,
+        &create_params.input_assembly_info,
         nullptr,
         &viewport_info,
-        &p.rasterization_info,
-        &p.multisample_info,
-        depth_stencil.empty() ? nullptr : &p.depth_stencil_info,
+        &create_params.rasterization_info,
+        &create_params.multisample_info,
+        depth_stencil.empty() ? nullptr : &create_params.depth_stencil_info,
         &blend_info,
         &dynamic_info,
         pipeline_layout,
@@ -256,15 +265,15 @@ void graphics_pipeline::init(
     );
     this->pipeline = vkres(*ctx, pipeline);
 
-    uvec2 size = p.targets[0]->get_size();
+    uvec2 size = create_params.targets[0]->get_size();
 
-    std::vector<VkImageView> image_views(p.targets.size());
+    std::vector<VkImageView> image_views(create_params.targets.size());
     for(uint32_t i = 0; i < ctx->get_image_count(); ++i)
     {
-        for(uint32_t j = 0; j < p.targets.size(); ++j)
+        for(uint32_t j = 0; j < create_params.targets.size(); ++j)
         {
-            p.targets[j]->set_layout(p.attachments[j].finalLayout);
-            image_views[j] = (*p.targets[j])[i].view;
+            create_params.targets[j]->set_layout(create_params.attachments[j].finalLayout);
+            image_views[j] = (*create_params.targets[j])[i].view;
         }
         VkFramebufferCreateInfo framebuffer_info = {
             VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -281,8 +290,6 @@ void graphics_pipeline::init(
         vkCreateFramebuffer(ctx->get_device().logical_device, &framebuffer_info, nullptr, &fb);
         framebuffers.emplace_back(*ctx, fb);
     }
-
-    create_params = p;
 }
 
 void graphics_pipeline::begin_render_pass(

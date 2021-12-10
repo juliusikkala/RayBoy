@@ -151,6 +151,7 @@ device::device(
         sync2_features.pNext = nullptr;
 
     physical_device_features.features.samplerAnisotropy = VK_TRUE;
+    physical_device_features.features.sampleRateShading = VK_TRUE;
     vulkan12_features.timelineSemaphore = VK_TRUE;
     vulkan12_features.scalarBlockLayout = VK_TRUE;
     sync2_features.synchronization2 = VK_TRUE;
