@@ -129,12 +129,6 @@ device::device(
     if(!found_device)
         throw std::runtime_error("Failed to find a device suitable for rendering");
 
-    if(physical_device_props.properties.vendorID == 4098)
-    {
-        // AMD is being too nitpicky about something with the acceleration structure building :/
-        found_rt_device = false;
-    }
-
     std::cout << "Using " << physical_device_props.properties.deviceName << std::endl;
     supports_ray_tracing = found_rt_device;
     std::cout << "Ray tracing " << (supports_ray_tracing ? "enabled" : "disabled") << std::endl;

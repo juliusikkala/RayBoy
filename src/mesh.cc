@@ -96,7 +96,7 @@ void mesh::rebuild_acceleration_structure()
             VK_FORMAT_R32G32B32_SFLOAT,
             vkGetBufferDeviceAddress(ctx->get_device().logical_device, &vertex_info),
             sizeof(vertex),
-            (uint32_t)(this->vertices.size()),
+            (uint32_t)(this->vertices.size()-1),
             VK_INDEX_TYPE_UINT32,
             vkGetBufferDeviceAddress(ctx->get_device().logical_device, &index_info),
             0
@@ -149,7 +149,7 @@ void mesh::rebuild_acceleration_structure()
     );
     as_build_info.scratchData.deviceAddress += alignment - (as_build_info.scratchData.deviceAddress % alignment);
 
-    vkres<VkBuffer> uncompact_blas_buffer = create_gpu_buffer(
+    blas_buffer = create_gpu_buffer(
         *ctx,
         build_size.accelerationStructureSize,
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR|
@@ -160,7 +160,7 @@ void mesh::rebuild_acceleration_structure()
         VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
         nullptr,
         0,
-        uncompact_blas_buffer,
+        blas_buffer,
         0,
         build_size.accelerationStructureSize,
         VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
@@ -168,23 +168,11 @@ void mesh::rebuild_acceleration_structure()
     };
     VkAccelerationStructureKHR as_tmp;
     vkCreateAccelerationStructureKHR(ctx->get_device().logical_device, &as_create_info, nullptr, &as_tmp);
-    vkres<VkAccelerationStructureKHR> uncompact_blas(*ctx, as_tmp);
-    as_build_info.dstAccelerationStructure = uncompact_blas;
-
-    VkQueryPool query_pool;
-    VkQueryPoolCreateInfo qp_info = {
-        VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
-        nullptr,
-        0,
-        VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
-        1,
-        0
-    };
-    vkCreateQueryPool(ctx->get_device().logical_device, &qp_info, nullptr, &query_pool);
+    blas = vkres(*ctx, as_tmp);
+    as_build_info.dstAccelerationStructure = blas;
 
     // Finally, actually build the acceleration structure.
     VkCommandBuffer cmd = begin_command_buffer(*ctx);
-    vkCmdResetQueryPool(cmd, query_pool, 0, 1);
 
     VkAccelerationStructureBuildRangeInfoKHR range = {
         max_primitive_count, 0, 0, 0
@@ -205,46 +193,6 @@ void mesh::rebuild_acceleration_structure()
         1, &barrier, 0, nullptr, 0, nullptr
     };
     vkCmdPipelineBarrier2KHR(cmd, &deps);
-    vkCmdWriteAccelerationStructuresPropertiesKHR(cmd, 1, &*uncompact_blas, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, query_pool, 0);
-    end_command_buffer(*ctx, cmd);
-
-    // But wait, we still have to compact it too! -.-
-    VkDeviceSize compacted_size = 0;
-    vkGetQueryPoolResults(
-        ctx->get_device().logical_device,
-        query_pool,
-        0,
-        1,
-        sizeof(VkDeviceSize),
-        &compacted_size,
-        sizeof(VkDeviceSize),
-        VK_QUERY_RESULT_WAIT_BIT
-    );
-    vkDestroyQueryPool(ctx->get_device().logical_device, query_pool, nullptr);
-
-    blas_buffer = create_gpu_buffer(
-        *ctx,
-        compacted_size,
-        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR|
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-    );
-    as_create_info.buffer = blas_buffer;
-    as_create_info.size = compacted_size;
-
-    vkCreateAccelerationStructureKHR(ctx->get_device().logical_device, &as_create_info, nullptr, &as_tmp);
-    blas = vkres(*ctx, as_tmp);
-
-    as_build_info.dstAccelerationStructure = blas;
-
-    cmd = begin_command_buffer(*ctx);
-    VkCopyAccelerationStructureInfoKHR copy_info = {
-        VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR,
-        nullptr,
-        uncompact_blas,
-        blas,
-        VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR
-    };
-    vkCmdCopyAccelerationStructureKHR(cmd, &copy_info);
     end_command_buffer(*ctx, cmd);
 
     // Really finally, get the address and store it.

@@ -51,7 +51,7 @@ vertex_data get_vertex_data(uint instance_index, uint primitive, vec2 barycentri
     vec3 weights = vec3(1.0f - barycentric.x - barycentric.y, barycentric);
 
     vec3 model_pos = vertex0.pos.xyz * weights.x + vertex1.pos.xyz * weights.y + vertex2.pos.xyz * weights.z;
-    vec3 model_normal = vertex0.normal .xyz* weights.x + vertex1.normal.xyz * weights.y + vertex2.normal.xyz * weights.z;
+    vec3 model_normal = vertex0.normal.xyz * weights.x + vertex1.normal.xyz * weights.y + vertex2.normal.xyz * weights.z;
     vec4 model_uv = vertex0.uv * weights.x + vertex1.uv * weights.y + vertex2.uv * weights.z;
     vec4 model_tangent = vertex0.tangent * weights.x + vertex1.tangent * weights.y + vertex2.tangent * weights.z;
 
@@ -427,13 +427,14 @@ vec3 refraction_path(
             float t = rayQueryGetIntersectionTEXT(rq, true);
             instance i = instances.array[nonuniformEXT(instance_id)];
             vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
-            mat = sample_material(
+            mat = sample_material_lod(
                 i.material,
                 front,
                 vd.uv.xy,
                 vd.normal,
                 vd.tangent,
-                vd.bitangent
+                vd.bitangent,
+                0
             );
 
             // RAYBOY HACK: Color the light slightly as it passes through the material.
