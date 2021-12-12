@@ -23,6 +23,7 @@ json options::serialize() const
     j["scene"] = scene;
     j["accumulation"] = accumulation;
     j["secondary_shadows"] = secondary_shadows;
+    j["hdr"] = hdr;
     return j;
 }
 
@@ -61,6 +62,7 @@ bool options::deserialize(const json& j)
         scene = j.value("scene", "white_room");
         accumulation = j.value("accumulation", -1);
         secondary_shadows = j.value("secondary_shadows", false);
+        hdr = j.value("hdr", false);
     }
     catch(...)
     {

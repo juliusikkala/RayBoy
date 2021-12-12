@@ -24,6 +24,7 @@ struct options
     std::string scene = "white_room";
     int accumulation = -1;
     bool secondary_shadows = false;
+    bool hdr = false;
 
     json serialize() const;
     bool deserialize(const json& j);

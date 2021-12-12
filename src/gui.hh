@@ -23,7 +23,8 @@ public:
         SET_RENDERING_MODE,
         SET_GB_COLOR,
         SET_RT_OPTION,
-        SET_SCENE
+        SET_SCENE,
+        HDR_TOGGLE
     };
 
     void handle_event(const SDL_Event& event);

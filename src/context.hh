@@ -21,6 +21,7 @@ public:
         ivec2 size = ivec2(1280, 720),
         bool fullscreen = false,
         bool vsync = true,
+        bool hdr = true,
         bool grab_mouse = false,
         int display = -1
     );
@@ -65,6 +66,11 @@ public:
     void set_vsync(bool vsync);
     bool get_vsync() const;
 
+    void set_hdr(bool hdr);
+    bool get_hdr() const;
+    bool is_hdr_available() const;
+    bool is_hdr_used() const;
+
 private:
     void init_sdl(bool fullscreen, bool grab_mouse, int display);
     void deinit_sdl();
@@ -83,6 +89,8 @@ private:
     ivec2 size;
     bool fullscreen;
     bool vsync;
+    bool hdr;
+    bool hdr_available;
     SDL_Window* win;
 
     // Vulkan-related members

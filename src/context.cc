@@ -11,9 +11,10 @@ context::context(
     ivec2 size,
     bool fullscreen,
     bool vsync,
+    bool hdr,
     bool grab_mouse,
     int display
-): size(size), fullscreen(fullscreen), vsync(vsync)
+): size(size), fullscreen(fullscreen), vsync(vsync), hdr(hdr)
 {
     init_sdl(fullscreen, grab_mouse, display);
     init_vulkan();
@@ -310,6 +311,26 @@ bool context::get_vsync() const
     return vsync;
 }
 
+void context::set_hdr(bool hdr)
+{
+    this->hdr = hdr;
+}
+
+bool context::get_hdr() const
+{
+    return hdr;
+}
+
+bool context::is_hdr_available() const
+{
+    return hdr_available;
+}
+
+bool context::is_hdr_used() const
+{
+    return surface_format.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
+}
+
 void context::init_sdl(bool fullscreen, bool grab_mouse, int display)
 {
     if(SDL_Init(SDL_INIT_EVERYTHING))
@@ -338,6 +359,7 @@ void context::init_sdl(bool fullscreen, bool grab_mouse, int display)
     if(!SDL_Vulkan_GetInstanceExtensions(win, &count, extensions.data()))
         throw std::runtime_error(SDL_GetError());
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    extensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
 }
 
 void context::deinit_sdl()
@@ -437,14 +459,25 @@ void context::init_swapchain()
     bool found_format = false;
     for(VkSurfaceFormatKHR format: formats)
     {
-        if(
+        if(format.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
+        {
+            hdr_available = true;
+        }
+
+        if(hdr && format.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
+        {
+            surface_format = format;
+            found_format = true;
+            break;
+        }
+        else if(
             (format.format == VK_FORMAT_B8G8R8A8_UNORM ||
             format.format == VK_FORMAT_R8G8B8A8_UNORM) &&
             format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
         ){
             surface_format = format;
             found_format = true;
-            break;
+            if(!hdr) break;
         }
     }
 

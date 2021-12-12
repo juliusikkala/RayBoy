@@ -93,7 +93,7 @@ game::game(const char* initial_rom)
 {
     frame_start = std::chrono::steady_clock::now();
     load_options(opt);
-    gfx_ctx.reset(new context(opt.window_size, opt.fullscreen, opt.vsync));
+    gfx_ctx.reset(new context(opt.window_size, opt.fullscreen, opt.vsync, opt.hdr));
     window_size = opt.window_size;
     audio_ctx.reset(new audio());
     ui.reset(new gui(*gfx_ctx, opt));
@@ -426,6 +426,10 @@ bool game::handle_input()
                 break;
             case gui::SET_SCENE:
                 load_scene(opt.scene);
+                break;
+            case gui::HDR_TOGGLE:
+                gfx_ctx->set_hdr(opt.hdr);
+                need_swapchain_reset = true;
                 break;
             }
             break;

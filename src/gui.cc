@@ -178,6 +178,15 @@ void gui::menu_window()
         SDL_PushEvent(&e);
     }
 
+    if(ctx->is_hdr_available() && ImGui::MenuItem("HDR", NULL, opts->hdr))
+    {
+        opts->hdr = !opts->hdr;
+        SDL_Event e;
+        e.type = SDL_USEREVENT;
+        e.user.code = HDR_TOGGLE;
+        SDL_PushEvent(&e);
+    }
+
     if(ImGui::BeginMenu("Resolution"))
     {
         static constexpr struct {

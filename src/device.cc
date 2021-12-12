@@ -37,16 +37,20 @@ device::device(
     VkSurfaceKHR surface,
     const std::vector<const char*>& validation_layers
 ){
-    const char* device_extensions[] = {
+    std::vector<const char*> required_extensions = {
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+    std::vector<const char*> rt_extensions = {
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_QUERY_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
     };
-    const uint32_t required_extension_count = 2;
-    const uint32_t rt_extension_count = required_extension_count + 4;
+    std::vector<const char*> hdr_extensions = {
+        VK_EXT_HDR_METADATA_EXTENSION_NAME
+    };
+    std::vector<const char*> enabled_extensions = required_extensions;
 
     // Find all physical devices
     uint32_t physical_device_count = 0;
@@ -58,6 +62,7 @@ device::device(
     // we require
     bool found_device = false;
     bool found_rt_device = false;
+    bool found_hdr_device = false;
     bool found_discrete_device = false;
     for(VkPhysicalDevice device: physical_devices)
     {
@@ -68,10 +73,11 @@ device::device(
         vkEnumerateDeviceExtensionProperties(device, nullptr, &available_count, extensions.data());
 
         bool found_all_required = true;
-        if(!has_all_extensions(extensions, device_extensions, required_extension_count))
+        if(!has_all_extensions(extensions, required_extensions.data(), required_extensions.size()))
             continue;
 
-        bool current_has_rt = has_all_extensions(extensions, device_extensions, std::size(device_extensions));
+        bool current_has_rt = has_all_extensions(extensions, rt_extensions.data(), rt_extensions.size());
+        bool current_has_hdr = has_all_extensions(extensions, hdr_extensions.data(), hdr_extensions.size());
         bool current_is_discrete = physical_device_props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 
         // Find required queue families
@@ -122,6 +128,7 @@ device::device(
             graphics_family_index = graphics_family;
             found_device = true;
             found_rt_device = current_has_rt;
+            found_hdr_device = current_has_hdr;
             found_discrete_device = current_is_discrete;
         }
     }
@@ -131,6 +138,11 @@ device::device(
 
     std::cout << "Using " << physical_device_props.properties.deviceName << std::endl;
     supports_ray_tracing = found_rt_device;
+    if(found_rt_device)
+        enabled_extensions.insert(enabled_extensions.end(), rt_extensions.begin(), rt_extensions.end());
+    if(found_hdr_device)
+        enabled_extensions.insert(enabled_extensions.end(), hdr_extensions.begin(), hdr_extensions.end());
+
     std::cout << "Ray tracing " << (supports_ray_tracing ? "enabled" : "disabled") << std::endl;
 
     // Get features
@@ -169,7 +181,7 @@ device::device(
         {},
         std::size(queue_infos), queue_infos,
         (uint32_t)validation_layers.size(), validation_layers.data(),
-        found_rt_device ? rt_extension_count : required_extension_count, device_extensions,
+        (uint32_t)enabled_extensions.size(), enabled_extensions.data(),
         nullptr
     };
     VkResult res = vkCreateDevice(physical_device, &device_create_info, nullptr, &logical_device);
