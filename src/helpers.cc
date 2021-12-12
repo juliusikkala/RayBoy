@@ -376,7 +376,8 @@ void end_command_buffer(context& ctx, VkCommandBuffer buf)
         1, &submit_info,
         0, nullptr
     };
-    vkQueueSubmit2KHR(ctx.get_device().graphics_queue, 1, &info, VK_NULL_HANDLE);
+    VkResult res = vkQueueSubmit2KHR(ctx.get_device().graphics_queue, 1, &info, VK_NULL_HANDLE);
+    assert(res == VK_SUCCESS);
     ctx.get_device().finish();
     vkFreeCommandBuffers(
         ctx.get_device().logical_device,

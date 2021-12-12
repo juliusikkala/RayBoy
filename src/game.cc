@@ -498,16 +498,19 @@ void game::render()
         need_pipeline_reset = true;
     }
 
-    if(!pipeline)
-    {
-        create_pipeline();
-        need_pipeline_reset = false;
-    }
-
     if(need_pipeline_reset)
     {
         need_pipeline_reset = false;
         pipeline->reset();
+    }
+
+    if(!pipeline)
+    {
+        // The old pipeline data can now be flushed.
+        // For some reason, this fixes an AMD crash.
+        gfx_ctx->sync_flush();
+        create_pipeline();
+        need_pipeline_reset = false;
     }
 
     ui->update();
