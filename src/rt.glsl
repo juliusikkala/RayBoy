@@ -29,6 +29,7 @@ struct vertex_data
 {
     vec3 pos;
     vec3 normal;
+    vec3 hard_normal;
     vec4 uv;
     vec3 tangent;
     vec3 bitangent;
@@ -51,6 +52,7 @@ vertex_data get_vertex_data(uint instance_index, uint primitive, vec2 barycentri
     vec3 weights = vec3(1.0f - barycentric.x - barycentric.y, barycentric);
 
     vec3 model_pos = vertex0.pos.xyz * weights.x + vertex1.pos.xyz * weights.y + vertex2.pos.xyz * weights.z;
+    vec3 model_hard_normal = normalize(cross(vertex0.pos.xyz-vertex1.pos.xyz, vertex0.pos.xyz-vertex2.pos.xyz));
     vec3 model_normal = vertex0.normal.xyz * weights.x + vertex1.normal.xyz * weights.y + vertex2.normal.xyz * weights.z;
     vec4 model_uv = vertex0.uv * weights.x + vertex1.uv * weights.y + vertex2.uv * weights.z;
     vec4 model_tangent = vertex0.tangent * weights.x + vertex1.tangent * weights.y + vertex2.tangent * weights.z;
@@ -58,6 +60,7 @@ vertex_data get_vertex_data(uint instance_index, uint primitive, vec2 barycentri
     vertex_data vd;
     vd.pos = vec3(i.model_to_world * vec4(model_pos, 1));
     vd.normal = normalize(mat3(i.model_to_world) * model_normal);
+    vd.hard_normal = normalize(mat3(i.model_to_world) * model_hard_normal);
     vd.uv = model_uv;
     vd.tangent = normalize(mat3(i.model_to_world) * model_tangent.xyz);
     vd.bitangent = normalize(cross(vd.normal, vd.tangent) * model_tangent.w);
@@ -423,12 +426,12 @@ vec3 refraction_path(
             uint instance_id = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
             uint primitive_id = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
             vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rq, true);
-            bool front = rayQueryGetIntersectionFrontFaceEXT(rq, true);
             float t = rayQueryGetIntersectionTEXT(rq, true);
-            instance i = instances.array[nonuniformEXT(instance_id)];
+            instance inst = instances.array[nonuniformEXT(instance_id)];
             vertex_data vd = get_vertex_data(instance_id, primitive_id, barycentrics);
+            bool front = dot(dir, vd.hard_normal) < 0;
             mat = sample_material_lod(
-                i.material,
+                inst.material,
                 front,
                 vd.uv.xy,
                 vd.normal,
@@ -442,9 +445,9 @@ vec3 refraction_path(
 
             vec3 shade;
             if(SECONDARY_SHADOWS == 0)
-                shade = light_tint * shade_point(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat);
+                shade = light_tint * shade_point(vd.pos, -dir, vd.normal, inst.environment_mesh.xyz, vd.uv.zw, mat);
             else
-                shade = shade_point_rt(vd.pos, -dir, vd.normal, i.environment_mesh.xyz, vd.uv.zw, mat, light_tint);
+                shade = shade_point_rt(vd.pos, -dir, vd.normal, inst.environment_mesh.xyz, vd.uv.zw, mat, light_tint);
 
             color += tint * shade;
             tint *= (1.0f - ggx_fresnel(clamp(dot(-dir, mat.normal), 0.0f, 1.0f), mat)) * mat.color.rgb * mat.transmittance;
